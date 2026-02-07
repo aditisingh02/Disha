@@ -1,0 +1,100 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║       NeuroFlow BharatFlow - Comprehensive .gitignore        ║
+# ╚══════════════════════════════════════════════════════════════╝
+neuroflow_india_master_blueprint.json
+README.zip
+# ───────────────────── Python ─────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ───────────────────── Virtual Environment ─────────────────────
+.venv/
+venv/
+ENV/
+env/
+.Python
+
+# ───────────────────── Environment Variables ─────────────────────
+.env
+.env.local
+.env.production
+.env.*.local
+*.env
+
+# ───────────────────── IDE & Editors ─────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.spyderproject
+.spyproject
+
+# ───────────────────── OS Files ─────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ───────────────────── Node.js (Frontend) ─────────────────────
+node_modules/
+neuroflow_frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ───────────────────── Build Outputs ─────────────────────
+neuroflow_frontend/dist/
+neuroflow_frontend/.next/
+neuroflow_frontend/out/
+*.tsbuildinfo
+
+# ───────────────────── ML Data & Model Weights (LARGE FILES) ─────────────────────
+# Training Datasets
+neuroflow_backend/data/datasets/*.csv
+neuroflow_backend/data/datasets/*.json
+neuroflow_backend/data/datasets/*.geojson
+neuroflow_backend/data/datasets_v2/*.csv
+neuroflow_backend/data/datasets_v2/*.json
+
+# Model Weights (PyTorch)
+neuroflow_backend/ml_models/weights/*.pth
+neuroflow_backend/ml_models/weights/*.pt
+
+# Scalers (Pickle)
+neuroflow_backend/ml_models/weights/*.pkl
+
+# ───────────────────── Cache Files ─────────────────────
+neuroflow_backend/data/cache/
+neuroflow_backend/cache/
+*.pkl
+*.cache
+
+# ───────────────────── Logs ─────────────────────
+*.log
+*.txt
+logs/
+!requirements.txt
+!README.txt
+
+# ───────────────────── Temporary & Debug Files ─────────────────────
+verify_log*.txt
+train_log*.txt
+train_error*.log
+check_*.py
+debug_*.py
+

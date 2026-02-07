@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NEUROFLOW BHARATFLOW — PROFESSIONAL GLASS INTERFACE
+   Clean • Modern • Industry-Grade
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* 
+     Color Palette: Professional Slate & Emerald
+     Primary: Slate-900 (Deep, Professional)
+     Accent: Emerald-600 (Sustainable, Traffic Flow)
+  */
+  --color-nf-primary: #0f172a;
+  /* slate-900 */
+  --color-nf-accent: #059669;
+  /* emerald-600 */
+  --color-nf-accent-light: #34d399;
+  /* emerald-400 */
+
+  --color-glas-bg: rgba(255, 255, 255, 0.75);
+  --color-glas-border: rgba(255, 255, 255, 0.6);
+  --color-glas-shadow: rgba(0, 0, 0, 0.08);
+}
+
+/* ── Base ────────────────────────────────────────────────────── */
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── Glassmorphism Utilities ─────────────────────────────────── */
+.glass-panel {
+  background: var(--color-glas-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-glas-border);
+  box-shadow: 0 8px 32px var(--color-glas-shadow);
+  border-radius: 16px;
+  /* Professional curvature */
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+  transition: all 0.2s ease-out;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Typography & Components ─────────────────────────────────── */
+.text-label {
+  @apply text-[10px] font-bold uppercase tracking-wider text-slate-500;
+}
+
+.btn-glass {
+  @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 outline-none;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  /* slate-300/50 */
+  color: #334155;
+  /* slate-700 */
+}
+
+.btn-glass:hover {
+  background: #ffffff;
+  border-color: #94a3b8;
+  /* slate-400 */
+  color: #0f172a;
+  /* slate-900 */
+}
+
+.btn-primary {
+  @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 outline-none;
+  background: var(--color-nf-primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+.btn-primary:hover {
+  background: #1e293b;
+  /* slate-800 */
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+}
+
+/* ── Animation Overrides (Subtle Only) ───────────────────────── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-enter {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Stagger delays */
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}

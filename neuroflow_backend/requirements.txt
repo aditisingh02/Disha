@@ -1,0 +1,31 @@
+# ── FastAPI & Server ──
+fastapi[standard]
+uvicorn[standard]
+python-multipart
+websockets
+
+# ── MongoDB (Async) ──
+motor
+pymongo[srv]
+
+# ── Pydantic & Configuration ──
+pydantic>=2.0
+pydantic-settings
+python-dotenv
+
+# ── Machine Learning ──
+torch
+torch-geometric
+scikit-learn
+
+# ── Geospatial ──
+networkx
+
+# ── Data Processing ──
+pandas
+numpy
+scipy
+
+# ── Utilities ──
+orjson
+httpx
