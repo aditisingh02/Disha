@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/v1", tags=["Traffic"])
 @router.get("/predict/traffic", response_model=TrafficPredictionResponse)
 async def get_traffic_predictions(
     limit: int = Query(default=50, ge=1, le=500, description="Max predictions to return"),
-    city: str = Query(default="bengaluru", description="Target city for predictions"),
+    city: str = Query(default="singapore", description="Target city for predictions"),
 ):
     """
     Return the latest ST-GCN traffic speed predictions.
@@ -79,7 +79,7 @@ from typing import List
 class RouteForecastRequest(BaseModel):
     origin: List[float]       # [lat, lng]
     destination: List[float]  # [lat, lng]
-    city: str = "bengaluru"
+    city: str = "singapore"
 
 class RouteForecastResponse(BaseModel):
     hourly_speeds: List[float]  # 48 values for 12 hours
@@ -125,9 +125,10 @@ async def get_route_forecast(request: RouteForecastRequest):
         seg_lat = lat1 + dlat * progress
         seg_lon = lon1 + dlon * progress
         
-        # Base speed varies by city and time
         base_speed = 35.0
-        if city == "bengaluru":
+        if city == "singapore":
+            base_speed = 45.0 if is_peak else 60.0  # Singapore expressways
+        elif city == "bengaluru":
             base_speed = 25.0 if is_peak else 40.0
         elif city == "mumbai":
             base_speed = 20.0 if is_peak else 35.0
