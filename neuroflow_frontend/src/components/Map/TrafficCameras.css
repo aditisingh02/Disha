@@ -1,0 +1,123 @@
+/* Traffic Cameras Styles */
+
+/* Camera Marker */
+.camera-marker {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.camera-marker:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+}
+
+/* Camera Popup */
+.camera-popup .maplibregl-popup-content {
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    min-width: 280px;
+    max-width: 320px;
+}
+
+.camera-popup__content {
+    background: white;
+}
+
+.camera-popup__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.camera-popup__image-container {
+    width: 100%;
+    height: 180px;
+    background: #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.camera-popup__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-popup__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.camera-popup__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    font-size: 11px;
+}
+
+.camera-popup__id {
+    color: #64748b;
+    font-family: monospace;
+}
+
+.camera-popup__hint {
+    color: #3b82f6;
+    font-weight: 500;
+}
+
+/* Loading Indicator */
+.camera-loading {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(30, 41, 59, 0.9);
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    backdrop-filter: blur(8px);
+    z-index: 100;
+}
+
+.camera-loading__icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

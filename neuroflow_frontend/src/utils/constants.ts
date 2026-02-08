@@ -27,6 +27,7 @@ export const DEFAULT_CENTER = {
 /** API base – proxied by Vite in dev */
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 export const WS_URL = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/api/v1/ws/live`;
+export const CHAT_WS_URL = import.meta.env.VITE_CHAT_WS_URL || `ws://${window.location.host}/api/v1/ws/chat`;
 
 /** ARAI emission factors (kg CO₂ / km) */
 export const EMISSION_FACTORS: Record<string, number> = {

@@ -3,6 +3,8 @@
 # ╚══════════════════════════════════════════════════════════════╝
 neuroflow_india_master_blueprint.json
 README.zip
+package.zip
+debug_model.zip
 # ───────────────────── Python ─────────────────────
 __pycache__/
 *.py[cod]

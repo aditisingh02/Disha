@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # ── Google Maps ──
     google_maps_api_key: str = Field(default="", description="Google Maps API key for routing and geocoding")
 
+    # ── LTA DataMall ──
+    lta_account_key: str = Field(default="", description="LTA DataMall API key for Singapore traffic data")
+
     # ── PyTorch ──
     torch_device: Literal["cuda", "cpu", "mps"] = Field(
         default="cuda", description="Device for PyTorch inference"

@@ -8,6 +8,8 @@ import EmissionCard from '@/components/Dashboard/EmissionCard';
 import BraessVisualizer from '@/components/Analytics/BraessVisualizer';
 import CorridorStats from '@/components/Analytics/CorridorStats';
 import ForecastModal from '@/components/Dashboard/ForecastModal';
+import ChatWidget from '@/components/Chat/ChatWidget';
+import CameraPanel from '@/components/Camera/CameraPanel';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 export default function App() {
@@ -90,6 +92,12 @@ export default function App() {
           </p>
         </div>
       </div>
+
+      {/* Chat Widget - Bottom Right */}
+      <ChatWidget />
+
+      {/* LTA Camera Panel - Right Sidebar */}
+      <CameraPanel />
     </div>
   );
 }

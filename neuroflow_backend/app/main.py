@@ -18,6 +18,8 @@ from app.core.config import settings
 from app.core.events import lifespan
 from app.api.v1.routes import router as traffic_router
 from app.api.v1.analytics import router as analytics_router
+from app.api.v1.chat import router as chat_router
+from app.api.v1.lta import router as lta_router
 
 # ── Logging ──
 logging.basicConfig(
@@ -64,6 +66,8 @@ app.add_middleware(
 # ── Register Routers ──
 app.include_router(traffic_router)
 app.include_router(analytics_router)
+app.include_router(chat_router)
+app.include_router(lta_router, prefix="/api/v1")
 
 
 # ═══════════════════════════════════════════════════════════════

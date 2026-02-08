@@ -3,6 +3,7 @@ import { GoogleMap, LoadScript, Marker, Polyline } from '@react-google-maps/api'
 import { useMapStore } from '@/stores/mapStore';
 import { useRouteStore } from '@/stores/routeStore';
 import { GOOGLE_MAPS_API_KEY } from '@/utils/constants';
+import TrafficCameras from './TrafficCameras';
 
 const containerStyle = {
   width: '100%',
@@ -298,6 +299,9 @@ export default function MapView() {
               zIndex={100}
             />
           )}
+
+          {/* LTA Traffic Cameras */}
+          <TrafficCameras map={map} visible={true} />
         </GoogleMap>
       </LoadScript>
 
