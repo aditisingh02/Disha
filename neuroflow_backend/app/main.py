@@ -28,6 +28,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.lta import router as lta_router
 from app.api.v1.orchestrator import router as orchestrator_router
+from app.api.v1.events import router as events_router
 
 # ── Logging ──
 logging.basicConfig(
@@ -77,6 +78,7 @@ app.include_router(analytics_router)
 app.include_router(chat_router)
 app.include_router(lta_router, prefix="/api/v1")
 app.include_router(orchestrator_router)
+app.include_router(events_router, prefix="/api/v1")
 
 
 # ═══════════════════════════════════════════════════════════════

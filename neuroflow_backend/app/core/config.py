@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     # ── LTA DataMall ──
     lta_account_key: str = Field(default="", description="LTA DataMall API key for Singapore traffic data")
+    
+    # ── PredictHQ ──
+    predicthq_access_token: str = Field(default="", description="PredictHQ Access Token")
 
     # ── PyTorch ──
     torch_device: Literal["cuda", "cpu", "mps"] = Field(

@@ -234,3 +234,14 @@ export function geocode(query: string): Promise<unknown> {
 export function reverseGeocode(lat: number, lon: number): Promise<unknown> {
   return fetchJSON(`/geoapify/reverse-geocode?lat=${lat}&lon=${lon}`);
 }
+
+// ── Events ─────────────────────────────────────────────
+import { Event } from '@/types';
+
+export function fetchUpcomingEvents(
+  lat: number,
+  lon: number,
+  radius: string = '10km'
+): Promise<Event[]> {
+  return fetchJSON<Event[]>(`/events/upcoming?lat=${lat}&lon=${lon}&radius=${radius}`);
+}

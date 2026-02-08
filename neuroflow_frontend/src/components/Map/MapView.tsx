@@ -4,6 +4,7 @@ import { useMapStore } from '@/stores/mapStore';
 import { useRouteStore } from '@/stores/routeStore';
 import { GOOGLE_MAPS_API_KEY } from '@/utils/constants';
 import TrafficCameras from './TrafficCameras';
+import TrafficEvents from './TrafficEvents';
 import { SINGAPORE_LOCATIONS } from '@/utils/locations';
 
 const containerStyle = {
@@ -330,6 +331,9 @@ export default function MapView() {
 
           {/* LTA Traffic Cameras */}
           <TrafficCameras map={map} visible={true} />
+
+          {/* PredictHQ Events */}
+          <TrafficEvents map={map} visible={true} />
 
           {/* Singapore Significant Places */}
           {apiLoaded && SINGAPORE_LOCATIONS.map((loc, idx) => (

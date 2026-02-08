@@ -188,3 +188,17 @@ export interface GoogleRouteData {
   durationSeconds: number;       // Raw value for calculations
   durationInTrafficSeconds?: number;
 }
+// ── Events ─────────────────────────────────────────────
+export interface Event {
+  id: string;
+  title: string;
+  description?: string;
+  category: string;
+  start: string;
+  end: string;
+  country: string;
+  location: [number, number]; // [lng, lat]
+  rank: number;
+  phq_rank?: number;
+  attendance?: number;
+}
