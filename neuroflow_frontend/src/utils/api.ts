@@ -245,3 +245,74 @@ export function fetchUpcomingEvents(
 ): Promise<Event[]> {
   return fetchJSON<Event[]>(`/events/upcoming?lat=${lat}&lon=${lon}&radius=${radius}`);
 }
+
+// -- Smart Route Distribution (Braess Paradox Solution) ---------
+
+/** Single route segment in the response */
+export interface SmartRouteSegment {
+  route_index: number;
+  polyline: string;
+  distance_meters: number;
+  distance_text: string;
+  duration_seconds: number;
+  duration_text: string;
+  summary: string;
+  steps: any[];
+  bounds: {
+    northeast?: { lat: number; lng: number };
+    southwest?: { lat: number; lng: number };
+  };
+  waypoints: [number, number][];
+}
+
+/** Response from POST /route/smart */
+export interface SmartRouteResponse {
+  success: boolean;
+  assigned_route_index: number;
+  total_routes: number;
+  alternatives: SmartRouteSegment[];
+  message: string;
+}
+
+/**
+ * Get or create a persistent user ID for smart route assignment.
+ * Stored in localStorage to ensure consistent route assignment.
+ */
+export function getUserId(): string {
+  if (typeof window === 'undefined') return 'server-side';
+  const STORAGE_KEY = 'neuroflow_user_id';
+  let userId = localStorage.getItem(STORAGE_KEY);
+
+  if (!userId) {
+    userId = 'user_' + Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15) +
+      '_' + Date.now().toString(36);
+    localStorage.setItem(STORAGE_KEY, userId);
+  }
+  return userId;
+}
+
+/**
+ * Fetch smart route assignment (Braess Paradox solution).
+ * Returns assigned route AND alternatives.
+ */
+export function getSmartRoute(
+  origin: { lat: number; lng: number },
+  dest: { lat: number; lng: number }
+): Promise<SmartRouteResponse> {
+  const userId = getUserId();
+  return fetchJSON<SmartRouteResponse>('/route/smart', {
+    method: 'POST',
+    body: JSON.stringify({
+      origin_lat: origin.lat,
+      origin_lng: origin.lng,
+      dest_lat: dest.lat,
+      dest_lng: dest.lng, // Fixed typo
+      user_id: userId,
+    }),
+  });
+}
+
+
+
+

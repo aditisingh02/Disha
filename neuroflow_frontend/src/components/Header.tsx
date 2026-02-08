@@ -19,7 +19,7 @@ export default function Header() {
 
                     <div>
                         <h1 className="text-sm font-bold text-slate-800 tracking-tight">
-                            NEUROFLOW
+                            DISHA
                         </h1>
                         <p className="text-[9px] text-slate-500 font-bold tracking-widest uppercase">
                             BharatFlow Intelligence

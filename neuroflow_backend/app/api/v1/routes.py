@@ -347,6 +347,101 @@ async def optimize_route(request: RouteRequest):
 
 
 # ═══════════════════════════════════════════════════════════════
+# POST /route/smart — Smart Route Distribution (Braess Paradox Solution)
+# ═══════════════════════════════════════════════════════════════
+
+from pydantic import BaseModel, Field
+from app.services.smart_router import smart_router
+
+
+class SmartRouteRequest(BaseModel):
+    """Request for smart route assignment."""
+    origin_lat: float = Field(..., description="Origin latitude")
+    origin_lng: float = Field(..., description="Origin longitude")
+    dest_lat: float = Field(..., description="Destination latitude")
+    dest_lng: float = Field(..., description="Destination longitude")
+    user_id: str = Field(..., description="Unique user identifier for consistent route assignment")
+
+
+class SmartRouteSegment(BaseModel):
+    """A single route option."""
+    route_index: int
+    polyline: str
+    distance_meters: int
+    distance_text: str
+    duration_seconds: int
+    duration_text: str
+    summary: str
+    steps: list = []
+    bounds: dict = {}
+    waypoints: list = []
+
+
+class SmartRouteResponse(BaseModel):
+    """Response with assigned route and alternatives."""
+    success: bool
+    assigned_route_index: int = Field(..., description="Index of the route assigned to this user")
+    total_routes: int
+    alternatives: list[SmartRouteSegment]
+    message: str
+
+
+@router.post("/route/smart", response_model=SmartRouteResponse)
+async def get_smart_route(request: SmartRouteRequest):
+    """
+    Get smart routes (assigned + alternatives).
+    """
+    if not smart_router.is_available:
+        raise HTTPException(
+            status_code=503,
+            detail="Smart routing unavailable — Geoapify API key not configured"
+        )
+    
+    assigned, all_routes = await smart_router.get_assigned_route(
+        origin_lat=request.origin_lat,
+        origin_lng=request.origin_lng,
+        dest_lat=request.dest_lat,
+        dest_lng=request.dest_lng,
+        user_id=request.user_id,
+    )
+    
+    if not assigned or not all_routes:
+        raise HTTPException(
+            status_code=404,
+            detail="No routes found between the specified origin and destination"
+        )
+    
+    # Create user-friendly message
+    if len(all_routes) > 1:
+        message = f"You've been assigned Route {assigned.route_index + 1} of {len(all_routes)} (via {assigned.summary})."
+    else:
+        message = f"Route via {assigned.summary}. Only one optimal route available."
+    
+    # Convert to Pydantic models
+    segments = []
+    for r in all_routes:
+        segments.append(SmartRouteSegment(
+            route_index=r.route_index,
+            polyline=r.polyline,
+            distance_meters=r.distance_meters,
+            distance_text=r.distance_text,
+            duration_seconds=r.duration_seconds,
+            duration_text=r.duration_text,
+            summary=r.summary,
+            steps=r.steps,
+            bounds=r.bounds,
+            waypoints=[[lat, lng] for lat, lng in r.waypoints],
+        ))
+    
+    return SmartRouteResponse(
+        success=True,
+        assigned_route_index=assigned.route_index,
+        total_routes=len(all_routes),
+        alternatives=segments,
+        message=message,
+    )
+
+# ═══════════════════════════════════════════════════════════════
 # GET /risk/heatmap — Risk Field Heatmap
 # ═══════════════════════════════════════════════════════════════
 

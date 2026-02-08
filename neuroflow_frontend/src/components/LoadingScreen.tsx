@@ -52,7 +52,7 @@ export default function LoadingScreen({ onComplete }: { onComplete: () => void }
 
                 {/* Title */}
                 <h1 className="text-4xl font-extrabold mb-2 text-neutral-800">
-                    NeuroFlow
+                    DISHA
                 </h1>
                 <p className="text-neutral-400 text-sm mb-8">BharatFlow Traffic Intelligence Platform</p>
 
