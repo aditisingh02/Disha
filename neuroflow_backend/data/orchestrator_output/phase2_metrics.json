@@ -1,0 +1,14 @@
+{
+  "phase2": "completed",
+  "test_mae": 11.31819791633193,
+  "test_rmse": 14.112806862528634,
+  "baseline_test_mae": 11.76076920909877,
+  "improvement_ratio": 0.03763115191686969,
+  "meets_30_percent_improvement": false,
+  "leakage_check_passed": true,
+  "horizons_hours": [
+    1,
+    6,
+    24
+  ]
+}

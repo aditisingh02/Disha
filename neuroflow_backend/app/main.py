@@ -12,12 +12,20 @@ import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse
 
 from app.core.config import settings
+
+# Use ORJSONResponse if orjson is installed (faster); else fall back to JSONResponse
+try:
+    import orjson  # noqa: F401
+    default_response_class = ORJSONResponse
+except ImportError:
+    default_response_class = JSONResponse
 from app.core.events import lifespan
 from app.api.v1.routes import router as traffic_router
 from app.api.v1.analytics import router as analytics_router
+from app.api.v1.orchestrator import router as orchestrator_router
 
 # ── Logging ──
 logging.basicConfig(
@@ -36,13 +44,13 @@ logger = logging.getLogger("neuroflow")
 app = FastAPI(
     title="NeuroFlow BharatFlow",
     description=(
-        "Cyber-Physical Traffic Orchestration System for Indian Urban Dynamics. "
+        "Cyber-Physical Traffic Orchestration System for Singapore. "
         "Solves the Braess Paradox through Nash Equilibrium routing, "
-        "ARAI-calibrated eco-routing, and physics-informed traffic prediction."
+        "Eco-routing, and physics-informed traffic prediction."
     ),
     version="3.0.0",
     lifespan=lifespan,
-    default_response_class=ORJSONResponse,
+    default_response_class=default_response_class,
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -64,6 +72,7 @@ app.add_middleware(
 # ── Register Routers ──
 app.include_router(traffic_router)
 app.include_router(analytics_router)
+app.include_router(orchestrator_router)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -75,8 +84,8 @@ async def root():
     return {
         "name": "NeuroFlow BharatFlow",
         "version": "3.0.0-production",
-        "description": "Cyber-Physical Traffic Orchestration for Indian Metros",
-        "pilot_zone": "Bengaluru (Silk Board → Indiranagar Corridor)",
+        "description": "Cyber-Physical Traffic Orchestration for Singapore",
+        "pilot_zone": "Singapore (Pan Island Expressway Corridor)",
         "docs": "/docs",
         "endpoints": {
             "traffic_predictions": "/api/v1/predict/traffic",
@@ -88,6 +97,9 @@ async def root():
             "emission_savings": "/api/v1/analytics/emission-savings",
             "braess_paradox": "/api/v1/analytics/braess-paradox",
             "system_health": "/api/v1/analytics/system-health",
+            "orchestrator_profile": "/api/v1/orchestrator/dataset-profile",
+            "orchestrator_baselines": "/api/v1/orchestrator/baseline-metrics",
+            "orchestrator_road_network": "/api/v1/orchestrator/road-network-summary",
             "websocket": "ws://localhost:8000/api/v1/ws/live",
         },
     }

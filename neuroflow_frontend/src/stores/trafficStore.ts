@@ -5,6 +5,7 @@ import type {
   RiskScore,
   HeatmapPoint,
 } from '@/types';
+import type { OrchestratorRouteForecast } from '@/utils/api';
 
 // Interface for route-specific forecast from backend
 export interface RouteForecast {
@@ -23,7 +24,9 @@ interface TrafficState {
   heatmap: HeatmapPoint[];
   lastUpdate: string | null;
   isConnected: boolean;
-  routeForecast: RouteForecast | null;  // NEW: Route-specific forecast
+  routeForecast: RouteForecast | null;
+  /** Same as terminal CLI: multi-horizon, congestion level, risk, routes (from orchestrator API) */
+  orchestratorRouteForecast: OrchestratorRouteForecast | null;
 
   setReadings: (r: TrafficReading[]) => void;
   setPredictions: (p: TrafficPrediction[]) => void;
@@ -31,7 +34,8 @@ interface TrafficState {
   setHeatmap: (h: HeatmapPoint[]) => void;
   setLastUpdate: (ts: string) => void;
   setConnected: (c: boolean) => void;
-  setRouteForecast: (f: RouteForecast | null) => void;  // NEW
+  setRouteForecast: (f: RouteForecast | null) => void;
+  setOrchestratorRouteForecast: (f: OrchestratorRouteForecast | null) => void;
   updateAll: (data: {
     readings?: TrafficReading[];
     readings_sample?: TrafficReading[];
@@ -77,7 +81,8 @@ export const useTrafficStore = create<TrafficState>((set) => ({
   heatmap: [],
   lastUpdate: null,
   isConnected: false,
-  routeForecast: null,  // NEW
+  routeForecast: null,
+  orchestratorRouteForecast: null,
 
   setReadings: (readings) => set({ readings }),
   setPredictions: (predictions) => set({ predictions }),
@@ -85,7 +90,8 @@ export const useTrafficStore = create<TrafficState>((set) => ({
   setHeatmap: (heatmap) => set({ heatmap }),
   setLastUpdate: (lastUpdate) => set({ lastUpdate }),
   setConnected: (isConnected) => set({ isConnected }),
-  setRouteForecast: (routeForecast) => set({ routeForecast }),  // NEW
+  setRouteForecast: (routeForecast) => set({ routeForecast }),
+  setOrchestratorRouteForecast: (orchestratorRouteForecast) => set({ orchestratorRouteForecast }),
 
   updateAll: (data) =>
     set((state) => ({

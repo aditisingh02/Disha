@@ -108,7 +108,7 @@ class SimulationLoop:
         for r in readings_dicts:
             # Infer city from segment_id (e.g. "bengaluru_seg_1")
             seg_id = r.get("segment_id", "")
-            city = seg_id.split("_")[0] if "_" in seg_id else "bengaluru"
+            city = seg_id.split("_")[0] if "_" in seg_id else "singapore"
             if city not in city_groups:
                 city_groups[city] = []
             city_groups[city].append(r)
@@ -212,7 +212,8 @@ class SimulationLoop:
                 ),
                 "total_predictions": len(self.latest_predictions),
             },
-            "readings_sample": self.latest_readings[:20],  # Send first 20 for live display
+            "readings_sample": self.latest_readings[:20],
+            "predictions": self.latest_predictions[:50],
             "risk_sample": self.latest_risk_scores[:20],
         }).decode()
 

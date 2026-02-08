@@ -142,7 +142,7 @@ class DataReplayService:
                     timestamp=now,
                     speed_kmh=round(current_speed, 2),
                     volume=volume,
-                    occupancy=round(min(1.0, congestion + np.random.uniform(-0.1, 0.1)), 3),
+                    occupancy=round(max(0.0, min(1.0, congestion + np.random.uniform(-0.1, 0.1))), 3),
                     speed_std=round(speed_std, 2),
                     location=GeoJSONPoint(
                         coordinates=[profile["lng"], profile["lat"]]

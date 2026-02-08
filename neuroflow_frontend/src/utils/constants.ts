@@ -11,17 +11,17 @@ export const BENGALURU_CENTER = {
 
 /** Default map view for Silk Board – Indiranagar corridor */
 export const DEFAULT_VIEW_STATE = {
-  longitude: 77.60,
-  latitude: 12.96,
-  zoom: 13.5,
+  longitude: 103.8198,
+  latitude: 1.3521,
+  zoom: 11.5,
   pitch: 45,
-  bearing: -20,
+  bearing: 0,
 } as const;
 
 /** Default Google Maps center */
 export const DEFAULT_CENTER = {
-  lat: 12.96,
-  lng: 77.60,
+  lat: 1.3521,
+  lng: 103.8198,
 } as const;
 
 /** API base – proxied by Vite in dev */

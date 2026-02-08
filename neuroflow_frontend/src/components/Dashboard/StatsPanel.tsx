@@ -43,27 +43,31 @@ export default function StatsPanel() {
     });
 
     const count = validPreds.length;
+    const hasQ90 = validPreds.some(p => p.hourly_speeds_q90 && p.hourly_speeds_q90.length === 48);
+    const avgQ50 = hasQ90 ? new Array(48).fill(0) : null;
+    const avgQ90 = hasQ90 ? new Array(48).fill(0) : null;
+    if (hasQ90) {
+      validPreds.forEach(p => {
+        p.hourly_speeds_q50?.forEach((v, i) => { if (i < 48) avgQ50![i] += v; });
+        p.hourly_speeds_q90?.forEach((v, i) => { if (i < 48) avgQ90![i] += v; });
+      });
+      avgQ50?.forEach((_, i) => { avgQ50![i] /= count; });
+      avgQ90?.forEach((_, i) => { avgQ90![i] /= count; });
+    }
     return avgSpeeds.map((total, idx) => {
       const avg = total / count;
-      // Time label: +15m * (idx+1)
       const hour = Math.floor((idx + 1) * 15 / 60);
       const min = ((idx + 1) * 15) % 60;
-      // Format label: +1h, +2h, etc. or pure time
-      // Let's use simplified X-Axis: +1h, +2h...
-      // We can label every 4th step (1 hour)
       let label = "";
-      if ((idx + 1) % 4 === 0) {
-        label = `+${(idx + 1) / 4}h`;
-      }
-
-      // Detailed label for tooltip
+      if ((idx + 1) % 4 === 0) label = `+${(idx + 1) / 4}h`;
       const fullLabel = min > 0 ? `+${hour}h ${min}m` : `+${hour}h`;
-
       return {
         name: label,
         tooltipLabel: fullLabel,
         speed: Math.round(avg),
-        idx: idx
+        speedQ50: avgQ50 ? Math.round(avgQ50[idx]) : undefined,
+        speedQ90: avgQ90 ? Math.round(avgQ90[idx]) : undefined,
+        idx,
       };
     });
   }, [predictions]);
@@ -99,7 +103,7 @@ export default function StatsPanel() {
         </div>
         <div className="flex-1">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">12-Hour System Forecast</h3>
-          <p className="text-[10px] text-slate-400">Average Speed across City • ST-GCN V2</p>
+          <p className="text-[10px] text-slate-400">Median + upper bound (q90) • LightGBM + GCN</p>
         </div>
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">
           <Activity size={12} className="text-emerald-500" />
@@ -144,7 +148,13 @@ export default function StatsPanel() {
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                 padding: '8px 12px',
               }}
-              formatter={(value: number) => [`${value} km/h`, 'Avg Speed']}
+              formatter={(value: number, name: string, props: { payload?: { speedQ50?: number; speedQ90?: number } }) => {
+                const p = props?.payload;
+                if (p?.speedQ50 != null && p?.speedQ90 != null && p.speedQ50 !== p.speedQ90) {
+                  return [`Median: ${p.speedQ50} km/h · Upper: ${p.speedQ90} km/h`, 'Speed range'];
+                }
+                return [`${value} km/h`, 'Avg Speed'];
+              }}
               labelFormatter={(label, payload) => {
                 if (payload && payload.length > 0 && payload[0]?.payload) {
                   const p = payload[0].payload as { tooltipLabel?: string };

@@ -1,0 +1,48 @@
+{
+  "dynamic_risk_fields": {
+    "risk_tensor_summary": {
+      "mean_per_road": {
+        "PIE": 0.3342333575405471,
+        "NORTH BRIDGE ROAD": 0.5151987412248851,
+        "VICTORIA STREET": 0.5073091261195837,
+        "RIVER VALLEY ROAD": 0.42297506656983785,
+        "JALAN BUKIT MERAH": 0.5161341079641734,
+        "UPPER THOMSON ROAD": 0.416076978939724,
+        "BUKIT TIMAH ROAD": 0.42745436940208187,
+        "ORCHARD ROAD": 0.4145064149116437,
+        "SERANGOON ROAD": 0.43137981118373275,
+        "SLE": 0.33055192447349313,
+        "KPE": 0.3196160735899298,
+        "ECP": 0.32547034616315657,
+        "TPE": 0.3302808036794965,
+        "CTE": 0.32070830307431614,
+        "AYE": 0.32302638586298715,
+        "MCE": 0.32227886710239656
+      },
+      "hotspot_count": 3,
+      "hotspot_roads": [
+        "NORTH BRIDGE ROAD",
+        "VICTORIA STREET",
+        "JALAN BUKIT MERAH"
+      ]
+    },
+    "method": "gaussian_kernel_density_temporal_decay"
+  },
+  "greenwave_eco_routing": {
+    "fastest_route": "min_time",
+    "greenest_route": "min_emission_CO2e",
+    "emission_metric": "CO2_equivalent_kg_km",
+    "pareto_front_available": false,
+    "dataset_avg_speed_kmh": 53.15958605664488,
+    "emission_proxy_kg_per_km": 0.1317
+  },
+  "event_impact_encoder": {
+    "attribution_scores": {
+      "event_impact_on_speed_kmh": -13.34,
+      "n_with_event": 5,
+      "n_without": 36715
+    },
+    "event_impact_heatmap_available": false,
+    "method": "attention_encoder_placeholder"
+  }
+}

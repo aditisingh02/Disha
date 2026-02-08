@@ -34,8 +34,8 @@ router = APIRouter(prefix="/api/v1", tags=["Traffic"])
 
 @router.get("/predict/traffic", response_model=TrafficPredictionResponse)
 async def get_traffic_predictions(
-    limit: int = Query(default=50, ge=1, le=500, description="Max predictions to return"),
-    city: str = Query(default="bengaluru", description="Target city for predictions"),
+    limit: int = Query(default=500, ge=1, le=1000, description="Max predictions to return"),
+    city: str = Query(default="singapore", description="Target city for predictions"),
 ):
     """
     Return the latest ST-GCN traffic speed predictions.
@@ -74,20 +74,24 @@ async def get_traffic_predictions(
 # ═══════════════════════════════════════════════════════════════
 
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class RouteForecastRequest(BaseModel):
     origin: List[float]       # [lat, lng]
     destination: List[float]  # [lat, lng]
-    city: str = "bengaluru"
+    city: str = "singapore"
 
 class RouteForecastResponse(BaseModel):
-    hourly_speeds: List[float]  # 48 values for 12 hours
+    hourly_speeds: List[float]  # 48 values, primary (q50 or legacy)
     peak_speed: float
     min_speed: float
     avg_speed: float
     timestamp: datetime
     model_version: str
+    hourly_speeds_q50: Optional[List[float]] = None  # baseline median
+    hourly_speeds_q90: Optional[List[float]] = None  # tail
+    regime_active: bool = False
+    residual_contribution_summary: Optional[dict] = None
 
 @router.post("/predict/route-forecast", response_model=RouteForecastResponse)
 async def get_route_forecast(request: RouteForecastRequest):
@@ -133,6 +137,8 @@ async def get_route_forecast(request: RouteForecastRequest):
             base_speed = 20.0 if is_peak else 35.0
         elif city == "delhi":
             base_speed = 22.0 if is_peak else 38.0
+        elif city == "singapore":
+            base_speed = 60.0 if not is_peak else 45.0  # Higher speeds for SG expressways
         
         # Add variation based on position (center of route might be busier)
         position_factor = 1.0 - 0.3 * math.sin(progress * math.pi)  # Dip in middle
@@ -161,8 +167,12 @@ async def get_route_forecast(request: RouteForecastRequest):
         # Fallback: generate demo forecast
         predictions = []
     
+    regime_active = False
+    residual_summary = None
+    hourly_speeds_q50_agg = None
+    hourly_speeds_q90_agg = None
+
     if not predictions or not predictions[0].hourly_speeds:
-        # Heuristic fallback
         base = 30.0 if not is_peak else 20.0
         hourly_speeds = []
         for step in range(48):
@@ -171,27 +181,40 @@ async def get_route_forecast(request: RouteForecastRequest):
             speed = base * (0.7 if future_is_peak else 1.0) + 5 * math.sin(step / 8)
             hourly_speeds.append(round(speed, 1))
     else:
-        # Aggregate predictions from all segments
         all_speeds = [p.hourly_speeds for p in predictions if p.hourly_speeds]
+        all_q50 = [p.hourly_speeds_q50 for p in predictions if getattr(p, "hourly_speeds_q50", None)]
+        all_q90 = [p.hourly_speeds_q90 for p in predictions if getattr(p, "hourly_speeds_q90", None)]
         if all_speeds:
             hourly_speeds = []
             for step in range(48):
                 avg = sum(s[step] for s in all_speeds) / len(all_speeds)
                 hourly_speeds.append(round(avg, 1))
+            if all_q50 and len(all_q50) == len(all_speeds):
+                hourly_speeds_q50_agg = [round(sum(s[step] for s in all_q50) / len(all_q50), 1) for step in range(48)]
+            if all_q90 and len(all_q90) == len(all_speeds):
+                hourly_speeds_q90_agg = [round(sum(s[step] for s in all_q90) / len(all_q90), 1) for step in range(48)]
+                diffs = [abs(a - b) for a, b in zip(hourly_speeds_q50_agg or hourly_speeds, hourly_speeds_q90_agg)]
+                if any(d > 0.01 for d in diffs):
+                    regime_active = True
+                    residual_summary = {"mean_abs_residual": round(sum(diffs) / len(diffs), 4)}
         else:
             hourly_speeds = [30.0] * 48
-    
+
     peak_speed = max(hourly_speeds)
     min_speed = min(hourly_speeds)
     avg_speed = sum(hourly_speeds) / len(hourly_speeds)
-    
+
     return RouteForecastResponse(
         hourly_speeds=hourly_speeds,
         peak_speed=round(peak_speed, 1),
         min_speed=round(min_speed, 1),
         avg_speed=round(avg_speed, 1),
         timestamp=datetime.utcnow(),
-        model_version=f"stgcn_{city}_v2"
+        model_version=f"stgcn_{city}_v2",
+        hourly_speeds_q50=hourly_speeds_q50_agg,
+        hourly_speeds_q90=hourly_speeds_q90_agg,
+        regime_active=regime_active,
+        residual_contribution_summary=residual_summary,
     )
 
 
@@ -388,7 +411,7 @@ async def get_traffic_segments(
 
 @router.get("/traffic/live")
 async def get_live_traffic(
-    limit: int = Query(default=100, ge=1, le=1000),
+    limit: int = Query(default=500, ge=1, le=1000),
 ):
     """Return the latest live traffic readings."""
     from app.core.events import simulation

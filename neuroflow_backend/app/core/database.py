@@ -17,19 +17,26 @@ _db: Optional[AsyncIOMotorDatabase] = None
 
 
 async def connect_to_mongodb() -> None:
-    """Initialize the MongoDB connection and create indexes."""
+    """Initialize the MongoDB connection and create indexes. On failure, leaves _db None so app can run without DB."""
     global _client, _db
 
-    logger.info("Connecting to MongoDB Atlas...")
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
-    _db = _client[settings.mongodb_db_name]
-
-    # Verify connection
-    await _client.admin.command("ping")
-    logger.info(f"Connected to MongoDB database: {settings.mongodb_db_name}")
-
-    # ── Create Indexes ──
-    await _create_indexes()
+    logger.info("Connecting to MongoDB...")
+    try:
+        _client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=2000)
+        _db = _client[settings.mongodb_db_name]
+        await _client.admin.command("ping")
+        logger.info(f"Connected to MongoDB database: {settings.mongodb_db_name}")
+        await _create_indexes()
+    except Exception as e:
+        logger.warning(
+            "MongoDB unavailable (%s). App will run without database. "
+            "Start MongoDB locally or set MONGODB_URI for Atlas.",
+            e,
+        )
+        if _client:
+            _client.close()
+        _client = None
+        _db = None
 
 
 async def _create_indexes() -> None:
@@ -79,11 +86,16 @@ async def close_mongodb_connection() -> None:
         logger.info("MongoDB connection closed.")
 
 
+def is_connected() -> bool:
+    """Return True if MongoDB is connected."""
+    return _db is not None
+
+
 def get_database() -> AsyncIOMotorDatabase:
     """Return the active database instance. Raises if not connected."""
     if _db is None:
         raise RuntimeError(
-            "MongoDB is not connected. Call connect_to_mongodb() first."
+            "MongoDB is not connected. Start MongoDB or set MONGODB_URI."
         )
     return _db
 

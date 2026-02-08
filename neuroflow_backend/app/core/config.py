@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     bengaluru_center_lat: float = Field(default=12.9716)
     bengaluru_center_lng: float = Field(default=77.5946)
 
+    # ── Singapore Zone ──
+    singapore_center_lat: float = Field(default=1.3521)
+    singapore_center_lng: float = Field(default=103.8198)
+
     # ── API Server ──
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)

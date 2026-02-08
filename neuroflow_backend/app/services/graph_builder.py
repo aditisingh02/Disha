@@ -32,18 +32,15 @@ INDIA_DEFAULT_SPEEDS = {
 
 # ── Named roads in the corridor ──
 _ROAD_NAMES = [
-    "Hosur Road", "Inner Ring Road", "Outer Ring Road",
-    "100 Feet Road", "80 Feet Road", "CMH Road",
-    "Old Madras Road", "Intermediate Ring Road",
-    "Koramangala Main Road", "Ejipura Main Road",
-    "Domlur Main Road", "HAL Old Airport Road",
-    "Sarjapur Road", "St Johns Road",
-    "Indiranagar 12th Main", "Indiranagar 100ft Road",
-    "Jakkasandra Cross", "Koramangala 1st Cross",
-    "Koramangala 5th Block", "Tavarekere Main Road",
-    "BDA Complex Road", "Sony World Signal Road",
-    "Agara Main Road", "Defence Colony Road",
-    "Domlur 2nd Stage", "Ulsoor Road",
+    "PIE (Pan Island Expressway)", "AYE (Ayer Rajah Expressway)", 
+    "CTE (Central Expressway)", "TPE (Tampines Expressway)",
+    "ECP (East Coast Parkway)", "KPE (Kallang-Paya Lebar Expressway)",
+    "SLE (Seletar Expressway)", "MCE (Marina Coastal Expressway)",
+    "Orchard Road", "Bukit Timah Road", "Upper Thomson Road",
+    "Serangoon Road", "Jalan Bukit Merah", "River Valley Road",
+    "Victoria Street", "North Bridge Road", "Nicoll Highway",
+    "Dunearn Road", "Adam Road", "Lornie Road", "Braddell Road",
+    "Bartley Road", "Paya Lebar Road", "Sims Avenue", "Geylang Road",
 ]
 
 
@@ -62,7 +59,7 @@ class GraphBuilderService:
 
     def __init__(self) -> None:
         self._graph: Optional[nx.MultiDiGraph] = None
-        self._cache_path = Path(settings.cache_dir) / "bengaluru_synth_graph.pkl"
+        self._cache_path = Path(settings.cache_dir) / "singapore_synth_graph.pkl"
 
     # ── Public API ─────────────────────────────────────────
 
@@ -129,7 +126,7 @@ class GraphBuilderService:
                     "coordinates": [[ud["x"], ud["y"]], [vd["x"], vd["y"]]],
                 },
                 "properties": {
-                    "segment_id": f"{u}-{v}-{key}",
+                    "segment_id": f"singapore_{u}-{v}-{key}",
                     "maxspeed_kmh": data.get("maxspeed_kmh", 30),
                     "current_speed_kmh": data.get(
                         "current_speed_kmh", data.get("maxspeed_kmh", 30)
@@ -156,8 +153,8 @@ class GraphBuilderService:
         rng = np.random.default_rng(42)
 
         rows, cols = 10, 7
-        lat_lo, lat_hi = 12.915, 12.980
-        lng_lo, lng_hi = 77.608, 77.645
+        lat_lo, lat_hi = 1.26, 1.45
+        lng_lo, lng_hi = 103.75, 103.98
 
         lats = np.linspace(lat_lo, lat_hi, rows)
         lngs = np.linspace(lng_lo, lng_hi, cols)

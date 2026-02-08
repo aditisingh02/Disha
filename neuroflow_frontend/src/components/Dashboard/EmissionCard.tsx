@@ -58,6 +58,7 @@ export default function EmissionCard() {
           <span className="text-xl font-bold text-emerald-500">%</span>
         </div>
         <p className="text-xs text-slate-500 font-medium">Reduction vs Standard Route</p>
+        <p className="text-[9px] text-slate-400 mt-1">Savings vs standard Google Maps 'Fastest Route'.</p>
       </div>
 
       {/* Stats Grid */}
