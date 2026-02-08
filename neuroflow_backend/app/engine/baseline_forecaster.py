@@ -86,6 +86,9 @@ class BaselineForecaster:
         current_readings: list of dicts with segment_id and feature keys.
         Returns: shape (N, 48) float array, one row per reading in same order.
         """
+        import pandas as pd
+        import warnings
+        
         if not current_readings:
             return np.zeros((0, HORIZONS), dtype=np.float32)
         if not self.initialize(city):
@@ -97,8 +100,15 @@ class BaselineForecaster:
             return out
         models = self._models[city]
         X = np.array([self._reading_to_features(r) for r in current_readings], dtype=np.float32)
-        # Predict each horizon
+        
+        # Convert to DataFrame with feature names to suppress LightGBM warning
+        X_df = pd.DataFrame(X, columns=BASELINE_FEATURE_COLS)
+        
+        # Predict each horizon with warnings suppressed
         preds = np.zeros((X.shape[0], HORIZONS), dtype=np.float32)
-        for h in range(HORIZONS):
-            preds[:, h] = models[h].predict(X)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="X does not have valid feature names")
+            for h in range(HORIZONS):
+                preds[:, h] = models[h].predict(X_df)
         return preds
+

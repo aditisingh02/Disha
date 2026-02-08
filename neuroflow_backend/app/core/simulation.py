@@ -179,7 +179,9 @@ class SimulationLoop:
                 await db.traffic_readings.insert_many(readings, ordered=False)
 
             if risk_scores:
-                for rs in risk_scores:
+                # Make deep copies to avoid mutating original dicts with _id
+                risk_copy = copy.deepcopy(risk_scores)
+                for rs in risk_copy:
                     if "location" in rs and rs["location"]:
                         loc = rs["location"]
                         if isinstance(loc, dict) and "coordinates" in loc:
@@ -187,7 +189,7 @@ class SimulationLoop:
                                 "type": "Point",
                                 "coordinates": loc["coordinates"],
                             }
-                await db.risk_scores.insert_many(risk_scores, ordered=False)
+                await db.risk_scores.insert_many(risk_copy, ordered=False)
 
         except Exception as e:
             logger.debug(f"DB persist error (non-critical): {e}")

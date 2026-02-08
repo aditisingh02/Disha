@@ -24,7 +24,7 @@ from app.models.schemas import TrafficPrediction
 
 logger = logging.getLogger("neuroflow.forecaster")
 
-from app.engine.models import IndoTrafficSTGCN, PhysicsInformedLoss, ResidualGCN, SimpleGCNLSTM
+from app.engine.models import IndoTrafficSTGCN, PhysicsInformedLoss, ResidualGCN, SimpleGCNLSTM, DeepTrafficModel, DeepTrafficModelV2
 from app.engine.baseline_forecaster import BaselineForecaster
 from app.engine.regime import regime_gate_active
 from app.engine.spatial_features import enrich_spatial_features, build_default_adjacency
@@ -95,31 +95,76 @@ class TrafficForecaster:
                 logger.error(f"❌ Failed to load Orchestrator model: {e}")
                 # Fallback to standard flow
         
-        # ── Fallback: Standard V2 Model ──
+        # ── Fallback: Try loading DeepTrafficModel or IndoTrafficSTGCN ──
         logger.info("Falling back to standard V2 model loading...")
         
-        model = IndoTrafficSTGCN(
-            num_nodes=num_nodes,
-            in_features=9, 
-            hidden_dim=64, 
-            output_horizons=48,
-            temporal_steps=24
-        ).to(self.device)
-
         weights_path = f"{settings.weights_dir}/stgcn_{city}_v2.pth"
         scaler_path = f"{settings.weights_dir}/scaler_{city}_v2.pkl"
         
+        model = None
+        
         try:
-            state_dict = torch.load(weights_path, map_location=self.device, weights_only=True)
-            model.load_state_dict(state_dict)
-            logger.info(f"✅ Loaded ST-GCN V2 weights for {city}")
-            self.scalers[city] = joblib.load(scaler_path)
+            checkpoint = torch.load(weights_path, map_location=self.device, weights_only=False)
+            
+            # Extract state_dict
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                state_dict = checkpoint["model_state_dict"]
+                num_features = checkpoint.get("num_features", 37)
+                epoch = checkpoint.get("epoch", "?")
+            else:
+                state_dict = checkpoint
+                num_features = 37
+                epoch = "?"
+            
+            # Detect model architecture from state_dict keys
+            state_keys = list(state_dict.keys())
+            
+            if any("input_embed" in k for k in state_keys):
+                # DeepTrafficModelV2 architecture (with attention)
+                logger.info(f"🔍 Detected DeepTrafficModelV2 architecture for {city}")
+                model = DeepTrafficModelV2(
+                    num_features=num_features,
+                    hidden=512,
+                    num_layers=8
+                ).to(self.device)
+                model.load_state_dict(state_dict)
+                logger.info(f"✅ Loaded DeepTrafficModelV2 checkpoint for {city} (epoch {epoch})")
+            elif any("input_layer" in k for k in state_keys):
+                # DeepTrafficModel architecture (V1)
+                logger.info(f"🔍 Detected DeepTrafficModel V1 architecture for {city}")
+                model = DeepTrafficModel(
+                    num_features=num_features,
+                    hidden=512,
+                    num_layers=8
+                ).to(self.device)
+                model.load_state_dict(state_dict)
+                logger.info(f"✅ Loaded DeepTrafficModel V1 checkpoint for {city} (epoch {epoch})")
+            else:
+                # IndoTrafficSTGCN architecture (fallback)
+                logger.info(f"🔍 Using IndoTrafficSTGCN architecture for {city}")
+                model = IndoTrafficSTGCN(
+                    num_nodes=num_nodes,
+                    in_features=9, 
+                    hidden_dim=64, 
+                    output_horizons=48,
+                    temporal_steps=24
+                ).to(self.device)
+                model.load_state_dict(state_dict)
+                logger.info(f"✅ Loaded ST-GCN checkpoint for {city} (epoch {epoch})")
+            
+            # Load scaler if available
+            try:
+                self.scalers[city] = joblib.load(scaler_path)
+            except FileNotFoundError:
+                self.scalers[city] = None
             
         except FileNotFoundError:
-            logger.warning(f"⚠️ No weights found for {city}. Using random initialization.")
+            logger.warning(f"⚠️ No weights found for {city}. Using DeepTrafficModel with random initialization.")
+            model = DeepTrafficModel(num_features=37, hidden=512, num_layers=8).to(self.device)
             self.scalers[city] = None
         except Exception as e:
             logger.warning(f"❌ Could not load weights for {city}: {e}")
+            model = DeepTrafficModel(num_features=37, hidden=512, num_layers=8).to(self.device)
             self.scalers[city] = None
 
         model.eval()

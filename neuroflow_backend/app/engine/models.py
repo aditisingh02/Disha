@@ -2,6 +2,131 @@
 import torch
 import torch.nn as nn
 
+
+class DeepTrafficModel(nn.Module):
+    """
+    Deep model with residual connections for traffic prediction.
+    Matches the architecture from train_singapore.py.
+    """
+    
+    def __init__(self, num_features, hidden=512, num_layers=8):
+        super().__init__()
+        self.num_features = num_features
+        
+        # Input layer
+        self.input_layer = nn.Sequential(
+            nn.Linear(num_features, hidden),
+            nn.LayerNorm(hidden),
+            nn.GELU(),
+            nn.Dropout(0.2)
+        )
+        
+        # Residual blocks for better gradient flow
+        self.res_blocks = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(hidden, hidden),
+                nn.LayerNorm(hidden),
+                nn.GELU(),
+                nn.Dropout(0.15),
+                nn.Linear(hidden, hidden),
+                nn.LayerNorm(hidden)
+            ) for _ in range(num_layers)
+        ])
+        
+        # Output head - predicts single speed band value
+        self.output = nn.Sequential(
+            nn.Linear(hidden, hidden // 2),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden // 2, 1)
+        )
+        
+        self.gelu = nn.GELU()
+        
+    def forward(self, x):
+        h = self.input_layer(x)
+        
+        for block in self.res_blocks:
+            h = self.gelu(h + block(h))  # Residual connection
+        
+        return self.output(h).squeeze(-1)
+
+
+class DeepTrafficModelV2(nn.Module):
+    """
+    Deep traffic model V2 with attention mechanism.
+    Matches the architecture from train_singapore.py V2 checkpoint.
+    Keys: input_embed, res_blocks.X.net.Y, attention, attn_norm, classifier
+    """
+    
+    def __init__(self, num_features, hidden=512, num_layers=8):
+        super().__init__()
+        self.num_features = num_features
+        
+        # Input embedding (matches input_embed.0/1 in checkpoint)
+        self.input_embed = nn.Sequential(
+            nn.Linear(num_features, hidden),
+            nn.LayerNorm(hidden),
+            nn.GELU(),
+            nn.Dropout(0.2)
+        )
+        
+        # Residual blocks with nested 'net' module
+        self.res_blocks = nn.ModuleList([
+            self._make_res_block(hidden) for _ in range(num_layers)
+        ])
+        
+        # Self-attention layer
+        self.attention = nn.MultiheadAttention(hidden, num_heads=8, batch_first=True)
+        self.attn_norm = nn.LayerNorm(hidden)
+        
+        # Classifier head
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden, hidden // 2),
+            nn.LayerNorm(hidden // 2),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden // 2, hidden // 4),
+            nn.LayerNorm(hidden // 4),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden // 4, 1)
+        )
+        
+        self.gelu = nn.GELU()
+        
+    def _make_res_block(self, hidden):
+        """Create a residual block with nested 'net' structure."""
+        return nn.ModuleDict({
+            'net': nn.Sequential(
+                nn.Linear(hidden, hidden),
+                nn.LayerNorm(hidden),
+                nn.GELU(),
+                nn.Dropout(0.15),
+                nn.Linear(hidden, hidden),
+                nn.LayerNorm(hidden)
+            )
+        })
+        
+    def forward(self, x):
+        # Input embedding
+        h = self.input_embed(x)
+        
+        # Residual blocks
+        for block in self.res_blocks:
+            h = self.gelu(h + block['net'](h))
+        
+        # Attention (for 2D input, add sequence dimension)
+        if h.dim() == 2:
+            h = h.unsqueeze(1)  # [B, 1, H]
+        attn_out, _ = self.attention(h, h, h)
+        h = self.attn_norm(h + attn_out)
+        h = h.squeeze(1)  # [B, H]
+        
+        # Classifier
+        return self.classifier(h).squeeze(-1)
+
+
 class IndoTrafficSTGCN(nn.Module):
     """
     Simplified Spatio-Temporal Graph Network (ST-MLP) for robust inference.

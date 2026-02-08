@@ -419,8 +419,15 @@ async def get_live_traffic(
     if not simulation:
         return {"readings": [], "timestamp": datetime.utcnow().isoformat()}
 
+    # Sanitize readings to remove MongoDB ObjectIds before JSON serialization
+    readings = []
+    for r in simulation.latest_readings[:limit]:
+        # Create a clean copy without _id
+        clean = {k: v for k, v in r.items() if k != "_id"}
+        readings.append(clean)
+
     return {
-        "readings": simulation.latest_readings[:limit],
+        "readings": readings,
         "timestamp": datetime.utcnow().isoformat(),
         "tick": simulation._tick_count,
     }
