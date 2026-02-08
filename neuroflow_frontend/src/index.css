@@ -18,8 +18,8 @@
   --color-nf-accent-light: #34d399;
   /* emerald-400 */
 
-  --color-glas-bg: rgba(255, 255, 255, 0.75);
-  --color-glas-border: rgba(255, 255, 255, 0.6);
+  --color-glas-bg: rgba(255, 255, 255, 1);
+  --color-glas-border: rgba(255, 255, 255, 1);
   --color-glas-shadow: rgba(0, 0, 0, 0.08);
 }
 
