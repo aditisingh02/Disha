@@ -12,7 +12,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 
 from app.core.config import settings
-from app.core.database import connect_to_mongodb, close_mongodb_connection
+from app.core.database import connect_to_mongodb, close_mongodb_connection, is_connected
 from app.services.graph_builder import GraphBuilderService
 from app.engine.forecaster import TrafficForecaster
 from app.core.simulation import SimulationLoop
@@ -41,11 +41,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("  NeuroFlow BharatFlow — Starting Up")
     logger.info("=" * 60)
 
-    # 1. Connect to MongoDB (fast — ~2s)
+    # 1. Connect to MongoDB (optional; app runs without it if unavailable)
     await connect_to_mongodb()
 
-    # 2. Seed emission factors (fast)
-    await _seed_emission_factors()
+    # 2. Seed emission factors only if DB is connected
+    if is_connected():
+        await _seed_emission_factors()
 
     # 3. Start heavy initialization in the background so server is immediately responsive
     _startup_task = asyncio.create_task(_initialize_services(), name="startup-init")

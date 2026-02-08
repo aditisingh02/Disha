@@ -48,7 +48,7 @@ export default function BraessVisualizer() {
         </div>
         <div className="flex-1">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Nash Equilibrium</h3>
-          <p className="text-[10px] text-slate-400">Game Theory Analysis</p>
+          <p className="text-[10px] text-slate-400">Efficiency gained by coordinating traffic flow instead of selfish routing.</p>
         </div>
         {paradoxDetected && (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-50 border border-amber-100">

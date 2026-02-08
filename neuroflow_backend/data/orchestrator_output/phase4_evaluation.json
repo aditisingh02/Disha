@@ -1,0 +1,17 @@
+{
+  "ablation": {
+    "baseline_historical_avg_test_mae": 11.76076920909877,
+    "baseline_persistence_test_mae": 18.164488017429193,
+    "phase2_stgcn_test_mae": 11.31819791633193
+  },
+  "robustness": {
+    "leakage_check_passed": true,
+    "temporal_split": "train 70% / val 15% / test 15% (chronological)"
+  },
+  "pitch_metrics": {
+    "forecast_baseline_mae": 11.76076920909877,
+    "forecast_stgcn_mae": 11.31819791633193,
+    "risk_hotspots_count": 3,
+    "event_impact_speed_kmh": -13.34
+  }
+}

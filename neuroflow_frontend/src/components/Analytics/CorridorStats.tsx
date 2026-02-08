@@ -23,7 +23,10 @@ export default function CorridorStats() {
           <div>
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Corridor Metrics</h3>
             <p className="text-[10px] text-slate-400">
-              {corridor?.corridor_name ?? 'Silk Board → Indiranagar'}
+              {corridor?.corridor_name ?? 'Orchard Road – Changi Airport'}
+            </p>
+            <p className="text-[9px] text-slate-400 opacity-80 mt-0.5">
+              Real-time metrics from 200+ sensors along the corridor.
             </p>
           </div>
         </div>

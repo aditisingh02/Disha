@@ -3,25 +3,25 @@
 /** Google Maps API Key */
 export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
-/** Singapore center (Downtown Core / Marina Bay) */
-export const SINGAPORE_CENTER = {
-  latitude: 1.3521,
-  longitude: 103.8198,
+/** Bengaluru center (Majestic / City Railway Station) */
+export const BENGALURU_CENTER = {
+  latitude: 12.9716,
+  longitude: 77.5946,
 } as const;
 
-/** Default map view for Singapore expressway network */
+/** Default map view for Silk Board – Indiranagar corridor */
 export const DEFAULT_VIEW_STATE = {
-  longitude: 103.82,
-  latitude: 1.35,
-  zoom: 12,
+  longitude: 103.8198,
+  latitude: 1.3521,
+  zoom: 11.5,
   pitch: 45,
   bearing: 0,
 } as const;
 
-/** Default Google Maps center (Singapore) */
+/** Default Google Maps center */
 export const DEFAULT_CENTER = {
-  lat: 1.35,
-  lng: 103.82,
+  lat: 1.3521,
+  lng: 103.8198,
 } as const;
 
 /** API base – proxied by Vite in dev */

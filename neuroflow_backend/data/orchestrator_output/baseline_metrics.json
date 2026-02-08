@@ -1,0 +1,16 @@
+{
+  "historical_average": {
+    "model": "historical_average",
+    "val_mae": 11.115255253604335,
+    "val_rmse": 14.186883194255785,
+    "test_mae": 11.76076920909877,
+    "test_rmse": 14.779349106562186
+  },
+  "arima_or_persistence": {
+    "model": "persistence",
+    "val_mae": 18.986928104575163,
+    "val_rmse": 24.359627062956704,
+    "test_mae": 18.164488017429193,
+    "test_rmse": 23.65979218332898
+  }
+}

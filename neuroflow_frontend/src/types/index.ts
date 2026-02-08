@@ -42,9 +42,11 @@ export interface TrafficPrediction {
   predicted_speed_t15: number;
   predicted_speed_t30: number;
   predicted_speed_t60: number;
-  hourly_speeds?: number[]; // 12-hour forecast (48 steps)
+  hourly_speeds?: number[]; // primary series (q50 or legacy)
   confidence: number;
   timestamp: string;
+  hourly_speeds_q50?: number[]; // baseline median (48 steps)
+  hourly_speeds_q90?: number[]; // tail bound (48 steps)
 }
 
 // ── Risk ───────────────────────────────────────────────

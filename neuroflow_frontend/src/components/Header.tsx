@@ -1,11 +1,12 @@
-import { useTrafficStore } from '@/stores/trafficStore';
+import { useState, useEffect } from 'react';
+import { useDataLive } from '@/hooks/useTrafficAPI';
 import { BrainCircuit, Target, Leaf, BarChart3, Clock as ClockIcon } from 'lucide-react';
 
 /**
  * Professional glass header with silver/slate accents.
  */
 export default function Header() {
-    const isConnected = useTrafficStore((s) => s.isConnected);
+    const dataLive = useDataLive();
 
     return (
         <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
@@ -39,14 +40,14 @@ export default function Header() {
 
                 {/* Right - Status & Time */}
                 <div className="flex items-center gap-4">
-                    {/* Live Status */}
-                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${isConnected ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
+                    {/* Live Status - reflects WebSocket or fresh REST data */}
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${dataLive ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
                         <div className={`relative flex h-2 w-2`}>
-                            {isConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-200"></span>}
-                            <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                            {dataLive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-200"></span>}
+                            <span className={`relative inline-flex rounded-full h-2 w-2 ${dataLive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                         </div>
-                        <span className={`text-[10px] font-bold tracking-wide ${isConnected ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {isConnected ? 'ONLINE' : 'OFFLINE'}
+                        <span className={`text-[10px] font-bold tracking-wide ${dataLive ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {dataLive ? 'ONLINE' : 'OFFLINE'}
                         </span>
                     </div>
 
@@ -68,13 +69,29 @@ function FeatureItem({ icon, label }: { icon: React.ReactNode; label: string }) 
 }
 
 function Clock() {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'Asia/Kolkata',
-    });
+    const [timeStr, setTimeStr] = useState(() =>
+        new Date().toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+            timeZone: 'Asia/Kolkata',
+        })
+    );
+    useEffect(() => {
+        const t = setInterval(() => {
+            setTimeStr(
+                new Date().toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true,
+                    timeZone: 'Asia/Kolkata',
+                })
+            );
+        }, 1000);
+        return () => clearInterval(t);
+    }, []);
 
     return (
         <div className="flex items-center gap-1.5 text-slate-400">

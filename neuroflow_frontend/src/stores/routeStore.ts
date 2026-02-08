@@ -30,7 +30,7 @@ interface RouteState {
 export const useRouteStore = create<RouteState>((set) => ({
   origin: null,
   destination: null,
-  mode: 'fastest',
+  mode: 'nash',
   vehicleType: 'car_petrol',
   googleRoute: null,
   isComputingRoute: false,

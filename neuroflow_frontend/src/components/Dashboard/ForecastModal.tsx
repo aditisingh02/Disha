@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { useTrafficStore } from '@/stores/trafficStore';
 import { useMemo } from 'react';
-import { X, Clock, TrendingUp, Info } from 'lucide-react';
+import { X, Clock, TrendingUp, Info, MapPin, AlertTriangle, Route } from 'lucide-react';
 
 interface ForecastModalProps {
     isOpen: boolean;
@@ -18,27 +18,27 @@ interface ForecastModalProps {
 
 export default function ForecastModal({ isOpen, onClose }: ForecastModalProps) {
     const routeForecast = useTrafficStore((s) => s.routeForecast);
+    const orchestratorRouteForecast = useTrafficStore((s) => s.orchestratorRouteForecast);
     const predictions = useTrafficStore((s) => s.predictions);
 
     const chartData = useMemo(() => {
-        // PRIORITY 1: Use route-specific forecast from backend
+        // PRIORITY 1: Use route-specific forecast from backend (q50 median + q90 when present)
         if (routeForecast && routeForecast.hourly_speeds?.length === 48) {
-            return routeForecast.hourly_speeds.map((speed, idx) => {
+            const q50 = routeForecast.hourly_speeds_q50 ?? routeForecast.hourly_speeds;
+            const q90 = routeForecast.hourly_speeds_q90 ?? routeForecast.hourly_speeds;
+            return (routeForecast.hourly_speeds as number[]).map((speed, idx) => {
                 const hour = Math.floor((idx + 1) * 15 / 60);
                 const min = ((idx + 1) * 15) % 60;
-
                 let label = "";
-                if ((idx + 1) % 8 === 0) {
-                    label = `+${(idx + 1) / 4}h`;
-                }
-
+                if ((idx + 1) % 8 === 0) label = `+${(idx + 1) / 4}h`;
                 const fullLabel = min > 0 ? `+${hour}h ${min}m` : `+${hour}h`;
-
                 return {
                     name: label,
                     tooltipLabel: fullLabel,
                     speed: Math.round(speed),
-                    idx: idx
+                    speedQ50: q50 ? Math.round(q50[idx]) : Math.round(speed),
+                    speedQ90: q90 ? Math.round(q90[idx]) : Math.round(speed),
+                    idx,
                 };
             });
         }
@@ -75,17 +75,22 @@ export default function ForecastModal({ isOpen, onClose }: ForecastModalProps) {
                 name: label,
                 tooltipLabel: fullLabel,
                 speed: Math.round(avg),
-                idx: idx
+                speedQ50: Math.round(avg),
+                speedQ90: Math.round(avg),
+                idx,
             };
         });
     }, [routeForecast, predictions]);
 
+    const hasUncertainty = routeForecast?.hourly_speeds_q90 != null && chartData.some((d: { speedQ50?: number; speedQ90?: number }) => (d.speedQ90 ?? d.speed) !== (d.speedQ50 ?? d.speed));
+    const q90Mins = chartData.length && routeForecast?.hourly_speeds_q90 ? Math.min(...routeForecast.hourly_speeds_q90) : null;
+    const escalationRisk = (q90Mins != null && q90Mins < 25) || (routeForecast?.regime_active && (routeForecast?.min_speed ?? 99) < 30);
+
     if (!isOpen) return null;
 
-    // Use routeForecast stats if available, otherwise calculate from chartData
-    const peakSpeed = routeForecast?.peak_speed ?? Math.max(...chartData.map(d => d.speed), 0);
-    const minSpeed = routeForecast?.min_speed ?? Math.min(...chartData.map(d => d.speed), 0);
-    const avgSpeed = routeForecast?.avg_speed ?? (chartData.length > 0 ? Math.round(chartData.reduce((a, b) => a + b.speed, 0) / chartData.length) : 0);
+    const peakSpeed = routeForecast?.peak_speed ?? Math.max(...chartData.map((d: { speed: number }) => d.speed), 0);
+    const minSpeed = routeForecast?.min_speed ?? Math.min(...chartData.map((d: { speed: number }) => d.speed), 0);
+    const avgSpeed = routeForecast?.avg_speed ?? (chartData.length > 0 ? Math.round(chartData.reduce((a: number, b: { speed: number }) => a + b.speed, 0) / chartData.length) : 0);
     const modelVersion = routeForecast?.model_version ?? 'demo';
 
     return (
@@ -113,6 +118,16 @@ export default function ForecastModal({ isOpen, onClose }: ForecastModalProps) {
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto flex-1">
+
+                    {escalationRisk && (
+                        <div className="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-amber-800">
+                            <AlertTriangleIcon />
+                            <div>
+                                <span className="font-semibold block">Congestion likely to escalate</span>
+                                <span className="text-sm">The 90th percentile forecast indicates possible spillover or sustained congestion. Consider alternate routes or timing.</span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -148,6 +163,10 @@ export default function ForecastModal({ isOpen, onClose }: ForecastModalProps) {
                                         <stop offset="0%" stopColor="#059669" stopOpacity={0.4} />
                                         <stop offset="100%" stopColor="#059669" stopOpacity={0} />
                                     </linearGradient>
+                                    <linearGradient id="gradientUncertainty" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.2} />
+                                        <stop offset="100%" stopColor="#94a3b8" stopOpacity={0} />
+                                    </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                                 <XAxis
@@ -176,7 +195,15 @@ export default function ForecastModal({ isOpen, onClose }: ForecastModalProps) {
                                         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                                         padding: '12px 16px',
                                     }}
-                                    formatter={(value: number) => [`${value} km/h`, 'Projected Speed']}
+                                    formatter={(value: number, name: string, props: { payload?: { speedQ50?: number; speedQ90?: number; speed?: number } }) => {
+                                        const p = props?.payload;
+                                        if (p && hasUncertainty && (p.speedQ50 != null || p.speedQ90 != null)) {
+                                            const med = p.speedQ50 ?? p.speed;
+                                            const upper = p.speedQ90 ?? p.speed;
+                                            if (med !== upper) return [`Median: ${med} km/h · Upper bound: ${upper} km/h`, 'Speed range'];
+                                        }
+                                        return [`${value} km/h`, 'Projected Speed'];
+                                    }}
                                     labelFormatter={(label, payload) => {
                                         if (payload && payload.length > 0 && payload[0]?.payload) {
                                             const p = payload[0].payload as { tooltipLabel?: string };
@@ -185,6 +212,16 @@ export default function ForecastModal({ isOpen, onClose }: ForecastModalProps) {
                                         return `Time: ${label}`;
                                     }}
                                 />
+                                {hasUncertainty && (
+                                    <Area
+                                        type="monotone"
+                                        dataKey="speedQ90"
+                                        stroke="transparent"
+                                        fill="url(#gradientUncertainty)"
+                                        strokeWidth={0}
+                                        animationDuration={1500}
+                                    />
+                                )}
                                 <Area
                                     type="monotone"
                                     dataKey="speed"
@@ -198,11 +235,118 @@ export default function ForecastModal({ isOpen, onClose }: ForecastModalProps) {
                         </ResponsiveContainer>
                     </div>
 
+                    {/* Orchestrator output (same as terminal CLI): multi-horizon, congestion, risk, routes */}
+                    {orchestratorRouteForecast && !orchestratorRouteForecast.error && (
+                        <div className="mt-8 space-y-6 border-t border-slate-200 pt-6">
+                            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <MapPin className="text-emerald-600" />
+                                Orchestrator Route Forecast (same as terminal)
+                            </h3>
+                            {orchestratorRouteForecast.origin_road && orchestratorRouteForecast.destination_road && (
+                                <p className="text-sm text-slate-600">
+                                    {orchestratorRouteForecast.origin_road} → {orchestratorRouteForecast.destination_road}
+                                </p>
+                            )}
+                            {/* Multi-horizon table */}
+                            {orchestratorRouteForecast.multi_horizon_forecasts && Object.keys(orchestratorRouteForecast.multi_horizon_forecasts).length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Multi-horizon forecasts</h4>
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-slate-50">
+                                                <tr>
+                                                    <th className="text-left p-2">Horizon</th>
+                                                    <th className="text-right p-2">Speed (km/h)</th>
+                                                    <th className="text-left p-2">Level</th>
+                                                    <th className="text-right p-2">Score</th>
+                                                    <th className="text-right p-2">Delay (min)</th>
+                                                    <th className="text-right p-2">CI 80%</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Object.entries(orchestratorRouteForecast.multi_horizon_forecasts).map(([horizon, f]) => (
+                                                    <tr key={horizon} className="border-t border-slate-100">
+                                                        <td className="p-2 font-medium">{horizon}</td>
+                                                        <td className="p-2 text-right">{f.speed_kmh?.toFixed(1) ?? '—'}</td>
+                                                        <td className="p-2">{f.level ?? '—'}</td>
+                                                        <td className="p-2 text-right">{(f.score ?? 0).toFixed(2)}</td>
+                                                        <td className="p-2 text-right">{f.delay_vs_freeflow_min != null ? f.delay_vs_freeflow_min.toFixed(1) : '—'}</td>
+                                                        <td className="p-2 text-right">
+                                                            {f.ci_80_lower != null && f.ci_80_upper != null
+                                                                ? `${f.ci_80_lower.toFixed(0)}–${f.ci_80_upper.toFixed(0)}`
+                                                                : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                            {/* Congestion classification */}
+                            {orchestratorRouteForecast.congestion_classification && (
+                                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                    <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                        <AlertTriangle className="text-amber-600" size={16} />
+                                        Congestion classification
+                                    </h4>
+                                    <div className="flex flex-wrap gap-4 text-sm">
+                                        <span><strong>Level:</strong> {orchestratorRouteForecast.congestion_classification.level}</span>
+                                        <span><strong>Score:</strong> {(orchestratorRouteForecast.congestion_classification.score ?? 0).toFixed(2)}</span>
+                                        {orchestratorRouteForecast.congestion_classification.delay_vs_freeflow_min != null && (
+                                            <span><strong>Delay vs free flow:</strong> {orchestratorRouteForecast.congestion_classification.delay_vs_freeflow_min.toFixed(1)} min</span>
+                                        )}
+                                        {orchestratorRouteForecast.congestion_classification.speed_ratio != null && (
+                                            <span><strong>Speed ratio:</strong> {(orchestratorRouteForecast.congestion_classification.speed_ratio * 100).toFixed(0)}%</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {/* Risk */}
+                            {orchestratorRouteForecast.risk && (
+                                <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200">
+                                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Risk</h4>
+                                    <div className="flex flex-wrap gap-4 text-sm">
+                                        <span>Origin risk: {(orchestratorRouteForecast.risk.origin_risk ?? 0).toFixed(2)}</span>
+                                        <span>Destination risk: {(orchestratorRouteForecast.risk.destination_risk ?? 0).toFixed(2)}</span>
+                                        <span>Hotspot count: {orchestratorRouteForecast.risk.hotspot_count ?? 0}</span>
+                                    </div>
+                                </div>
+                            )}
+                            {/* Routes */}
+                            {orchestratorRouteForecast.routes && (
+                                <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200">
+                                    <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                        <Route className="text-emerald-600" size={16} />
+                                        Routes
+                                    </h4>
+                                    {orchestratorRouteForecast.routes.path?.length > 0 && (
+                                        <p className="text-sm text-slate-600 mb-2">
+                                            Path: {orchestratorRouteForecast.routes.path.join(' → ')}
+                                        </p>
+                                    )}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                        <span>Total: {orchestratorRouteForecast.routes.total_km?.toFixed(1) ?? '—'} km</span>
+                                        <span>Fastest: {orchestratorRouteForecast.routes.fastest_route_time_min?.toFixed(0) ?? '—'} min</span>
+                                        <span>Eco: {orchestratorRouteForecast.routes.eco_route_time_min?.toFixed(0) ?? '—'} min</span>
+                                        <span>Emission reduction: {orchestratorRouteForecast.routes.percent_emission_reduction?.toFixed(0) ?? '—'}%</span>
+                                    </div>
+                                    <div className="mt-2 text-xs text-slate-500">
+                                        Fastest emissions: {orchestratorRouteForecast.routes.fastest_route_emissions_kg?.toFixed(2) ?? '—'} kg · Eco: {orchestratorRouteForecast.routes.eco_route_emissions_kg?.toFixed(2) ?? '—'} kg
+                                    </div>
+                                </div>
+                            )}
+                            {orchestratorRouteForecast.model_version && (
+                                <p className="text-xs text-slate-500">Model: {orchestratorRouteForecast.model_version}</p>
+                            )}
+                        </div>
+                    )}
+
                     <div className="mt-4 flex items-start gap-3 p-4 bg-blue-50/50 rounded-lg border border-blue-100 text-sm text-blue-800">
                         <Info className="shrink-0 mt-0.5" size={18} />
                         <div>
                             <span className="font-semibold block mb-1">About this Forecast</span>
-                            This prediction is generated by the ST-GCN (Spatio-Temporal Graph Convolutional Network) model, analyzing real-time data from 300+ sensors across the city. It accounts for weather patterns, historical trends, and live event data.
+                            Median (solid) and upper-bound (q90) uncertainty band when available. Confidence reflects spread between median and tail. LightGBM baseline + regime-gated residual GCN for peak-risk awareness. Not a single deterministic number—use the range for decision support.
                         </div>
                     </div>
 

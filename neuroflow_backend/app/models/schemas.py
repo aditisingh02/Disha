@@ -67,14 +67,16 @@ class TrafficReading(BaseModel):
 
 
 class TrafficPrediction(BaseModel):
-    """ST-GCN prediction output for a road segment."""
+    """Prediction output for a road segment (q50 baseline + optional q90 tail)."""
     segment_id: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     predicted_speed_t15: float = Field(..., description="Predicted speed at T+15 min")
     predicted_speed_t30: float = Field(..., description="Predicted speed at T+30 min")
     predicted_speed_t60: float = Field(..., description="Predicted speed at T+60 min")
-    hourly_speeds: list[float] = Field(..., description="Predicted speeds for next 12 hours (48 steps)")
-    confidence: float = Field(default=0.0, ge=0, le=1.0)
+    hourly_speeds: list[float] = Field(..., description="Primary series (q50 or legacy)")
+    confidence: float = Field(default=0.0, ge=0, le=1.0, description="Uncertainty/confidence from q50–q90 spread")
+    hourly_speeds_q50: Optional[list[float]] = Field(default=None, description="Baseline median (48 steps)")
+    hourly_speeds_q90: Optional[list[float]] = Field(default=None, description="Tail bound q90 (48 steps)")
 
 
 class TrafficPredictionResponse(BaseModel):
@@ -156,7 +158,7 @@ class RouteResponse(BaseModel):
 
 class CorridorStats(BaseModel):
     """Aggregated stats for the Silk Board – Indiranagar corridor."""
-    corridor_name: str = "Silk Board → Indiranagar"
+    corridor_name: str = "Orchard Road – Changi Airport"
     avg_speed_kmh: float
     avg_travel_time_min: float
     congestion_index: float = Field(description="0-1 where 1 = fully jammed")

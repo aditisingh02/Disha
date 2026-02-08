@@ -20,23 +20,27 @@ from app.core.config import settings
 logger = logging.getLogger("neuroflow.graph_builder")
 
 # ── Default free-flow speeds for Indian road classes (km/h) ──
-# ── Singapore Speed Limits (km/h) ──
-DEFAULT_SPEEDS = {
-    "motorway": 90, "motorway_link": 70,
-    "trunk": 70, "trunk_link": 50,
-    "primary": 60, "primary_link": 40,
-    "secondary": 50, "secondary_link": 30,
-    "tertiary": 40, "tertiary_link": 25,
-    "residential": 30, "living_street": 20,
-    "unclassified": 40, "service": 20,
+INDIA_DEFAULT_SPEEDS = {
+    "motorway": 80, "motorway_link": 60,
+    "trunk": 60, "trunk_link": 40,
+    "primary": 50, "primary_link": 35,
+    "secondary": 40, "secondary_link": 30,
+    "tertiary": 30, "tertiary_link": 25,
+    "residential": 25, "living_street": 15,
+    "unclassified": 30, "service": 15,
 }
 
 # ── Named roads in the corridor ──
-# ── Named roads in Singapore ──
 _ROAD_NAMES = [
-    "PIE", "AYE", "CTE", "ECP", "TPE", "SLE", "KPE", "BKE", "MCE",
-    "Bukit Timah Rd", "Orchard Rd", "Nicoll Highway", "Thomson Rd",
-    "Lornie Rd", "Queensway", "Commonwealth Ave", "Serangoon Rd"
+    "PIE (Pan Island Expressway)", "AYE (Ayer Rajah Expressway)", 
+    "CTE (Central Expressway)", "TPE (Tampines Expressway)",
+    "ECP (East Coast Parkway)", "KPE (Kallang-Paya Lebar Expressway)",
+    "SLE (Seletar Expressway)", "MCE (Marina Coastal Expressway)",
+    "Orchard Road", "Bukit Timah Road", "Upper Thomson Road",
+    "Serangoon Road", "Jalan Bukit Merah", "River Valley Road",
+    "Victoria Street", "North Bridge Road", "Nicoll Highway",
+    "Dunearn Road", "Adam Road", "Lornie Road", "Braddell Road",
+    "Bartley Road", "Paya Lebar Road", "Sims Avenue", "Geylang Road",
 ]
 
 
@@ -65,7 +69,7 @@ class GraphBuilderService:
             logger.info(f"Loading cached graph from {self._cache_path}")
             await asyncio.to_thread(self._load_from_cache)
         else:
-            logger.info("Building synthetic Singapore road graph…")
+            logger.info("Building synthetic Bengaluru corridor road graph…")
             await asyncio.to_thread(self._build_synthetic_graph)
             await asyncio.to_thread(self._save_to_cache)
 
@@ -139,16 +143,18 @@ class GraphBuilderService:
 
     def _build_synthetic_graph(self) -> None:
         """
-        Create a realistic road network for Singapore.
-        Grid: 5 rows (N-S) x 10 cols (E-W) to cover the island (approx 40km x 20km).
+        Create a realistic road network for the
+        Silk Board → Indiranagar corridor (~7 km × 4 km).
+
+        Grid: 10 rows (N-S) × 7 cols (E-W) = 70 intersections
+        plus diagonal cross-streets and ring-road jumps → ~400+ directed edges.
         """
         G = nx.MultiDiGraph()
         rng = np.random.default_rng(42)
 
-        # ── Singapore Coordinates (Approx 1.25-1.45, 103.65-104.05) ──
-        rows, cols = 5, 10
-        lat_lo, lat_hi = 1.25, 1.45
-        lng_lo, lng_hi = 103.65, 104.05
+        rows, cols = 10, 7
+        lat_lo, lat_hi = 1.26, 1.45
+        lng_lo, lng_hi = 103.75, 103.98
 
         lats = np.linspace(lat_lo, lat_hi, rows)
         lngs = np.linspace(lng_lo, lng_hi, cols)
@@ -158,8 +164,8 @@ class GraphBuilderService:
         nid = 0
         for r in range(rows):
             for c in range(cols):
-                lat = float(lats[r] + rng.uniform(-0.005, 0.005))
-                lng = float(lngs[c] + rng.uniform(-0.005, 0.005))
+                lat = float(lats[r] + rng.uniform(-0.0003, 0.0003))
+                lng = float(lngs[c] + rng.uniform(-0.0003, 0.0003))
                 G.add_node(nid, y=lat, x=lng, street_count=int(rng.integers(2, 5)))
                 nm[(r, c)] = nid
                 nid += 1
@@ -180,26 +186,25 @@ class GraphBuilderService:
                 length=round(length, 1),
                 oneway=False,
                 lanes="2" if hw in ("trunk", "primary") else "1",
-                maxspeed=str(DEFAULT_SPEEDS.get(hw, 30)),
+                maxspeed=str(INDIA_DEFAULT_SPEEDS.get(hw, 30)),
             )
             G.add_edge(u, v, 0, **attrs)
             G.add_edge(v, u, 0, **attrs)
 
         # ── E-W roads (horizontal) ──
-        ew = ["motorway", "trunk", "primary", "secondary", "motorway"]
+        ew = ["secondary", "primary", "trunk", "secondary", "tertiary",
+              "primary", "secondary", "trunk", "tertiary", "primary"]
         for r in range(rows):
             rn = _name()
-            # Loop E-W
             for c in range(cols - 1):
-                _bidir(nm[(r, c)], nm[(r, c + 1)], ew[r % len(ew)], rn)
+                _bidir(nm[(r, c)], nm[(r, c + 1)], ew[r], rn)
 
         # ── N-S roads (vertical) ──
-        ns = ["primary", "secondary", "trunk", "secondary", "trunk", "secondary", "primary", "trunk", "secondary", "primary"]
+        ns = ["primary", "secondary", "trunk", "secondary", "trunk", "secondary", "primary"]
         for c in range(cols):
             rn = _name()
-            # Loop N-S
             for r in range(rows - 1):
-                _bidir(nm[(r, c)], nm[(r + 1, c)], ns[c % len(ns)], rn)
+                _bidir(nm[(r, c)], nm[(r + 1, c)], ns[c], rn)
 
         # ── Diagonal cross-streets ──
         for r in range(rows - 1):
@@ -209,10 +214,16 @@ class GraphBuilderService:
                 if (r + c) % 4 == 1 and c > 0:
                     _bidir(nm[(r, c)], nm[(r + 1, c - 1)], "residential")
 
-        # ── Ring-road long jumps (Simulate Expressways cutting through) ──
+        # ── Ring-road long jumps ──
         mid = cols // 2
         for r in range(0, rows - 2, 2):
-            _bidir(nm[(r, mid)], nm[(r + 2, mid)], "motorway", "CTE (Central Expy)")
+            _bidir(nm[(r, mid)], nm[(r + 2, mid)], "trunk", "Inner Ring Road")
+
+        # ── Extra skip-links for route diversity ──
+        _bidir(nm[(0, 0)], nm[(2, 2)], "secondary", "BTM Shortcut")
+        _bidir(nm[(3, 4)], nm[(5, 6)], "secondary", "Koramangala Bypass")
+        _bidir(nm[(6, 1)], nm[(8, 3)], "secondary", "Domlur Link Road")
+        _bidir(nm[(7, 5)], nm[(9, 6)], "tertiary", "HAL Link")
 
         self._graph = G
         os.makedirs(self._cache_path.parent, exist_ok=True)
@@ -239,7 +250,7 @@ class GraphBuilderService:
                 hw = data.get("highway", "unclassified")
                 if isinstance(hw, list):
                     hw = hw[0]
-                speed = DEFAULT_SPEEDS.get(hw, 30)
+                speed = INDIA_DEFAULT_SPEEDS.get(hw, 30)
             else:
                 raw = data["maxspeed"]
                 if isinstance(raw, list):

@@ -46,10 +46,65 @@ Develop a city-scale traffic forecasting and decision-support system for Mumbai 
 *   All architectural decisions logged in `docs/changes.md`.
 
 ## Directory Structure
-- `backend/`: FastAPI application.
-- `frontend/`: React dashboard application.
-- `data/`: Raw and processed data storage.
-- `ml/`: Machine learning notebooks, models, and scripts.
-- `simulation/`: Simulation and historical replay logic.
+- `neuroflow_backend/`: FastAPI application & Orchestrator.
+- `neuroflow_frontend/`: React dashboard application.
 - `docs/`: Project documentation and logs.
+
+---
+
+## 🚀 Setup & Execution Guide
+
+### Prerequisites
+- **Python 3.10+**
+- **Node.js 18+**
+
+### 1. Backend Setup
+```bash
+cd neuroflow_backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 2. Frontend Setup
+```bash
+cd neuroflow_frontend
+npm install
+```
+
+### 3. Running the System
+
+#### Option A: Orchestrator Terminal Mode ( verification & training)
+Run the full 4-Phase pipeline (Profiling -> Forecasting -> Innovation -> Evaluation) in your terminal. This trains the models and verifies system integrity.
+```bash
+cd neuroflow_backend
+# Run full timeline
+python -m app.orchestrator.terminal_mode --timeline
+
+# Run interactive CLI demo
+python -m app.orchestrator.terminal_mode --cli
+```
+
+#### Option B: Full Stack (Interactive Dashboard)
+Run the backend and frontend in separate terminals.
+
+**Terminal 1 (Backend):**
+```bash
+cd neuroflow_backend
+source .venv/bin/activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Terminal 2 (Frontend):**
+```bash
+cd neuroflow_frontend
+npm run dev
+```
+
+Open your browser at [http://localhost:5173](http://localhost:5173).
+
+### Key Features
+- **Phase 2 Forecasting:** ST-GCN model predicting traffic 12 hours ahead with uncertainty bands.
+- **Eco-Routing:** Calibration for Indian driving cycles to minimize emissions.
+- **Risk Heatmaps:** Dynamic identification of high-risk congestion zones.
 

@@ -1,0 +1,172 @@
+{
+  "schema": [
+    {
+      "name": "source",
+      "dtype": "str"
+    },
+    {
+      "name": "timestamp",
+      "dtype": "str"
+    },
+    {
+      "name": "hour",
+      "dtype": "int64"
+    },
+    {
+      "name": "day_of_week",
+      "dtype": "int64"
+    },
+    {
+      "name": "is_weekday",
+      "dtype": "bool"
+    },
+    {
+      "name": "is_peak_hour",
+      "dtype": "bool"
+    },
+    {
+      "name": "road_name",
+      "dtype": "str"
+    },
+    {
+      "name": "road_category",
+      "dtype": "int64"
+    },
+    {
+      "name": "latitude",
+      "dtype": "float64"
+    },
+    {
+      "name": "longitude",
+      "dtype": "float64"
+    },
+    {
+      "name": "speed_band",
+      "dtype": "int64"
+    },
+    {
+      "name": "has_incident",
+      "dtype": "bool"
+    },
+    {
+      "name": "month",
+      "dtype": "int64"
+    },
+    {
+      "name": "nearby_events",
+      "dtype": "int64"
+    },
+    {
+      "name": "event_attendance",
+      "dtype": "int64"
+    },
+    {
+      "name": "event_max_rank",
+      "dtype": "int64"
+    },
+    {
+      "name": "has_major_event",
+      "dtype": "int64"
+    },
+    {
+      "name": "has_sports_event",
+      "dtype": "int64"
+    },
+    {
+      "name": "has_concert",
+      "dtype": "int64"
+    },
+    {
+      "name": "has_conference",
+      "dtype": "int64"
+    },
+    {
+      "name": "date",
+      "dtype": "str"
+    },
+    {
+      "name": "is_rainy",
+      "dtype": "int64"
+    },
+    {
+      "name": "rain_intensity",
+      "dtype": "float64"
+    },
+    {
+      "name": "extreme_weather_flag",
+      "dtype": "int64"
+    },
+    {
+      "name": "weather_severity_index",
+      "dtype": "float64"
+    },
+    {
+      "name": "precipitation_lag1",
+      "dtype": "float64"
+    },
+    {
+      "name": "precipitation_lag3",
+      "dtype": "float64"
+    },
+    {
+      "name": "precipitation_lag6",
+      "dtype": "float64"
+    },
+    {
+      "name": "is_holiday",
+      "dtype": "int64"
+    },
+    {
+      "name": "holiday_type",
+      "dtype": "str"
+    },
+    {
+      "name": "holiday_intensity_score",
+      "dtype": "float64"
+    },
+    {
+      "name": "peak_day_probability",
+      "dtype": "float64"
+    },
+    {
+      "name": "peak_driver_type",
+      "dtype": "str"
+    }
+  ],
+  "missing_value_report": {
+    "_message": "No missing values in any column"
+  },
+  "temporal_coverage": {
+    "min": "2025-01-01T07:00:00",
+    "max": "2026-02-07T22:00:00",
+    "span_days": 402,
+    "unique_timestamps": 2295
+  },
+  "geometry_summary": {
+    "unique_lat_lon_pairs": 36720,
+    "unique_road_names": 16,
+    "road_categories": [
+      "1",
+      "2",
+      "3"
+    ]
+  },
+  "target_summary": {
+    "speed_band_value_counts": {
+      "1": 1031,
+      "2": 2028,
+      "3": 5478,
+      "4": 6434,
+      "5": 6278,
+      "6": 5735,
+      "7": 4923,
+      "8": 4813
+    },
+    "speed_band_min_max": [
+      1,
+      8
+    ]
+  },
+  "n_rows": 36720,
+  "profiled_at": "2026-02-08T03:18:26.588344+00:00"
+}

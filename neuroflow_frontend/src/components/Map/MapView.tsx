@@ -4,6 +4,7 @@ import { useMapStore } from '@/stores/mapStore';
 import { useRouteStore } from '@/stores/routeStore';
 import { GOOGLE_MAPS_API_KEY } from '@/utils/constants';
 import TrafficCameras from './TrafficCameras';
+import { SINGAPORE_LOCATIONS } from '@/utils/locations';
 
 const containerStyle = {
   width: '100%',
@@ -115,22 +116,31 @@ export default function MapView() {
     setComputingRoute(true);
     console.log('[MapView] 🚀 Fetching traffic-aware directions...');
 
-    directionsServiceRef.current.route(
+        // Google Maps Directions API: departureTime (now or future) + trafficModel required for duration_in_traffic
+        const now = new Date();
+        directionsServiceRef.current.route(
       {
         origin: { lat: origin[0], lng: origin[1] },
         destination: { lat: destination[0], lng: destination[1] },
         travelMode: google.maps.TravelMode.DRIVING,
         provideRouteAlternatives: false,
         drivingOptions: {
-          departureTime: new Date(),
+          departureTime: now,
           trafficModel: google.maps.TrafficModel.BEST_GUESS,
         },
       },
       (result, status) => {
+        // Always clear computing state so dashboard and Sidebar stay in sync (Google Maps API compliance)
+        const clearComputing = () => {
+          setComputingRoute(false);
+        };
+
         if (status !== google.maps.DirectionsStatus.OK || !result) {
           console.error('[MapView] ❌ Directions failed:', status);
           setRouteSegments([]);
+          setGoogleRoute(null);
           setError(`Route calculation failed: ${status}`);
+          clearComputing();
           return;
         }
 
@@ -138,7 +148,10 @@ export default function MapView() {
 
         const route = result.routes[0];
         if (!route || !route.legs || !route.legs[0]) {
+          setRouteSegments([]);
+          setGoogleRoute(null);
           setError('Invalid route data received');
+          clearComputing();
           return;
         }
 
@@ -172,19 +185,34 @@ export default function MapView() {
         });
 
         // Fetch route-specific forecast from ST-GCN model
-        import('@/utils/api').then(({ getRouteForecast }) => {
+        import('@/utils/api').then(({ getRouteForecast, getOrchestratorRouteForecast }) => {
           import('@/stores/trafficStore').then(({ useTrafficStore }) => {
             const setRouteForecast = useTrafficStore.getState().setRouteForecast;
+            const setOrchestratorRouteForecast = useTrafficStore.getState().setOrchestratorRouteForecast;
             getRouteForecast(
               [origin![0], origin![1]],
               [destination![0], destination![1]],
-              'bengaluru'
+              'singapore'
             ).then(forecast => {
               console.log('[MapView] 🔮 Route forecast received:', forecast);
               setRouteForecast(forecast);
             }).catch(err => {
               console.error('[MapView] ❌ Forecast fetch failed:', err);
             });
+            // Same output as terminal CLI: multi-horizon, congestion level, risk, routes (for Forecast modal)
+            getOrchestratorRouteForecast({
+              origin_lat: origin![0],
+              origin_lon: origin![1],
+              destination_lat: destination![0],
+              destination_lon: destination![1],
+            }).then(orch => {
+              if (!orch.error) {
+                console.log('[MapView] 📊 Orchestrator route forecast (terminal-equivalent):', orch);
+                setOrchestratorRouteForecast(orch);
+              } else {
+                setOrchestratorRouteForecast(null);
+              }
+            }).catch(() => setOrchestratorRouteForecast(null));
           });
         });
 
@@ -302,6 +330,45 @@ export default function MapView() {
 
           {/* LTA Traffic Cameras */}
           <TrafficCameras map={map} visible={true} />
+
+          {/* Singapore Significant Places */}
+          {apiLoaded && SINGAPORE_LOCATIONS.map((loc, idx) => (
+            <Marker
+              key={idx}
+              position={{ lat: loc.lat, lng: loc.lng }}
+              label={{
+                text: loc.label || loc.name,
+                color: 'white',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                className: 'bg-slate-800/80 px-2 py-1 rounded-md'
+              }}
+              icon={{
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 12,
+                fillColor: loc.label === 'START' ? '#10b981' : '#3b82f6',
+                fillOpacity: 1,
+                strokeColor: 'white',
+                strokeWeight: 2,
+              }}
+              onClick={() => {
+                if(loc.label === 'START') {
+                   setOrigin([loc.lat, loc.lng]);
+                   setPickMode('destination');
+                } else if(loc.label === 'END') {
+                   setDestination([loc.lat, loc.lng]);
+                   setPickMode(null);
+                } else {
+                   // Fallback logic
+                   if (pickMode === 'origin') {
+                      setOrigin([loc.lat, loc.lng]);
+                   } else {
+                      setDestination([loc.lat, loc.lng]);
+                   }
+                }
+              }}
+            />
+          ))}
         </GoogleMap>
       </LoadScript>
 

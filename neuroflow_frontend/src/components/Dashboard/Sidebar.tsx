@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useRouteStore } from '@/stores/routeStore';
 import { useMapStore } from '@/stores/mapStore';
+import { useTrafficStore } from '@/stores/trafficStore';
 import type { VehicleType } from '@/types';
 import { calculateEmission, formatEmission } from '@/utils/geo';
 import {
@@ -26,6 +27,15 @@ export default function Sidebar() {
   const isComputingRoute = useRouteStore((s) => s.isComputingRoute);
   const error = useRouteStore((s) => s.error);
   const clearRoute = useRouteStore((s) => s.clearRoute);
+  const setRouteForecast = useTrafficStore((s) => s.setRouteForecast);
+  const setOrchestratorRouteForecast = useTrafficStore((s) => s.setOrchestratorRouteForecast);
+  const orchestratorRouteForecast = useTrafficStore((s) => s.orchestratorRouteForecast);
+
+  const handleClearRoute = useCallback(() => {
+    clearRoute();
+    setRouteForecast(null);
+    setOrchestratorRouteForecast(null);
+  }, [clearRoute, setRouteForecast, setOrchestratorRouteForecast]);
 
   const setPickMode = useMapStore((s) => s.setPickMode);
   const showHeatmap = useMapStore((s) => s.showHeatmap);
@@ -122,7 +132,7 @@ export default function Sidebar() {
             <div className="flex items-center justify-between">
               <SectionHeader icon={<Activity size={16} />} title="Route Analytics" />
               <button
-                onClick={clearRoute}
+                onClick={handleClearRoute}
                 className="text-xs flex items-center gap-1 text-slate-400 hover:text-red-500 transition-colors"
               >
                 <X size={12} /> Clear
@@ -173,6 +183,28 @@ export default function Sidebar() {
                   </p>
                 </div>
               </div>
+
+              {/* Orchestrator summary (same data as terminal) — reported on dashboard */}
+              {orchestratorRouteForecast && !orchestratorRouteForecast.error && orchestratorRouteForecast.congestion_classification && (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Orchestrator Forecast</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-700">
+                      Congestion: <strong>{orchestratorRouteForecast.congestion_classification.level}</strong>
+                      {orchestratorRouteForecast.routes?.percent_emission_reduction != null && (
+                        <span className="text-slate-500 ml-1">· Eco saves {orchestratorRouteForecast.routes.percent_emission_reduction.toFixed(0)}%</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-forecast-modal'))}
+                      className="text-[10px] font-semibold text-emerald-600 hover:text-emerald-700 whitespace-nowrap"
+                    >
+                      View full forecast
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -1,276 +1,388 @@
 """
-NeuroFlow BharatFlow — Traffic Forecaster (Singapore Edition)
-Uses Deep Residual Network (ResNet) for high-accuracy traffic speed prediction.
-Supports dynamic 12-hour forecasting via time-shifted inference.
+NeuroFlow BharatFlow — Indo-Traffic ST-GCN Forecaster
+Spatio-Temporal Graph Convolutional Network for traffic speed prediction.
+Uses simplified ST-MLP architecture for robustness and lightweight inference.
+
+Architecture:
+    Input: [N, T, F] — N nodes, T timesteps, F features (Speed)
+    Spatial: Shared MLP across nodes
+    Temporal: 1D Conv layers along time axis
+    Output: Predicted speed for T+15, T+30, T+60 minutes
 """
 
 import logging
-import joblib
-import os
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Optional, Dict
+from datetime import datetime
 
 import numpy as np
-import pandas as pd
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 from app.core.config import settings
 from app.models.schemas import TrafficPrediction
-from app.engine.singapore_model import DeepTrafficModel
 
 logger = logging.getLogger("neuroflow.forecaster")
 
+from app.engine.models import IndoTrafficSTGCN, PhysicsInformedLoss, ResidualGCN, SimpleGCNLSTM
+from app.engine.baseline_forecaster import BaselineForecaster
+from app.engine.regime import regime_gate_active
+from app.engine.spatial_features import enrich_spatial_features, build_default_adjacency
+from pathlib import Path
+
+
 class TrafficForecaster:
     """
-    Traffic Prediction Engine for Singapore.
-    Loads the trained Deep ResNet model and generates forecasts by querying
-    the model with future timestamps.
+    High-level interface for traffic prediction.
+    Wraps the ST-GCN model with data preprocessing and postprocessing.
+    Supports multi-city models.
     """
 
     def __init__(self, device: str = "cuda") -> None:
         self.device = torch.device(device if torch.cuda.is_available() and device == "cuda" else "cpu")
-        self.models: Dict[str, DeepTrafficModel] = {}
+        self.models: Dict[str, IndoTrafficSTGCN] = {}
         self.scalers: Dict[str, object] = {}
-        self.encoders: Dict[str, object] = {}
-        self.feature_columns: Dict[str, List[str]] = {}
+        self._node_count: Dict[str, int] = {}
         self._initialized = False
+        weights_dir = Path(settings.weights_dir) if getattr(settings, "weights_dir", None) else Path(__file__).resolve().parent.parent / "ml_models" / "weights"
+        self._baseline = BaselineForecaster(weights_dir=weights_dir)
+        self._weights_dir = weights_dir
+        self._residual_models: Dict[str, ResidualGCN] = {}
 
-    def initialize(self, city: str = "singapore", num_nodes: int = 17) -> None:
-        """Load trained Singapore model artifacts."""
-        try:
-            weights_dir = Path(settings.weights_dir)
-            weights_path = weights_dir / f"stgcn_{city}_v1.pth" # Using V1 (Best Regression Model)
-            scaler_path = weights_dir / f"scaler_{city}.pkl"
-            encoders_path = weights_dir / f"encoders_{city}.pkl"
-            features_path = weights_dir / f"features_{city}.pkl"
-
-            if not weights_path.exists():
-                logger.warning(f"⚠️ Model weights not found at {weights_path}. Using random init for testing.")
-                # We will initialize a dummy model to prevent crashes during dev without weights
-                # Assuming ~35 features as per training
-                dummy_features = 35 
-                model = DeepTrafficModel(num_features=dummy_features, hidden=512, num_layers=8).to(self.device)
+    def initialize(self, city: str = "bengaluru", num_nodes: int = 250) -> None:
+        """Initialize the model for a specific city."""
+        import joblib
+        import os
+        
+        # ── Strategy: Try loading the high-fidelity Orchestrator model first ──
+        # This model (SimpleGCNLSTM) was trained in phase2_forecasting.py
+        # It expects 6 features: [hour, day_of_week, is_peak_hour, weather, rain, speed]
+        # And outputs 3 horizons: [1h, 6h, 24h]
+        
+        orch_weights_path = f"data/orchestrator_output/phase2_model.pt"
+        orch_scaler_path = f"data/orchestrator_output/phase2_scaler.pkl"
+        
+        if os.path.exists(orch_weights_path) and os.path.exists(orch_scaler_path):
+            try:
+                logger.info(f"🚀 Loading Orchestrator Phase 2 model from {orch_weights_path}")
+                
+                # Check metrics to verify dimensions if possible, or just assume standard Phase 2 config
+                # Phase 2 uses 3 horizons [1, 6, 24] and 6 input features
+                model = SimpleGCNLSTM(
+                    num_nodes=num_nodes,
+                    in_features=6,
+                    hidden=64,
+                    n_horizons=3
+                ).to(self.device)
+                
+                state_dict = torch.load(orch_weights_path, map_location=self.device, weights_only=True)
+                model.load_state_dict(state_dict)
+                logger.info(f"✅ Loaded SimpleGCNLSTM (Orchestrator) weights")
+                
+                self.scalers[city] = joblib.load(orch_scaler_path)
+                logger.info(f"✅ Loaded Phase 2 Scaler")
+                
                 model.eval()
                 self.models[city] = model
+                self._node_count[city] = num_nodes
                 self._initialized = True
+                
+                # Mark as using orchestrator model for predict method to know
+                self.models[f"{city}_is_orchestrator"] = True
                 return
 
-            # Load Artifacts
-            logger.info(f"Loading model artifacts for {city}...")
-            checkpoint = torch.load(weights_path, map_location=self.device)
+            except Exception as e:
+                logger.error(f"❌ Failed to load Orchestrator model: {e}")
+                # Fallback to standard flow
+        
+        # ── Fallback: Standard V2 Model ──
+        logger.info("Falling back to standard V2 model loading...")
+        
+        model = IndoTrafficSTGCN(
+            num_nodes=num_nodes,
+            in_features=9, 
+            hidden_dim=64, 
+            output_horizons=48,
+            temporal_steps=24
+        ).to(self.device)
+
+        weights_path = f"{settings.weights_dir}/stgcn_{city}_v2.pth"
+        scaler_path = f"{settings.weights_dir}/scaler_{city}_v2.pkl"
+        
+        try:
+            state_dict = torch.load(weights_path, map_location=self.device, weights_only=True)
+            model.load_state_dict(state_dict)
+            logger.info(f"✅ Loaded ST-GCN V2 weights for {city}")
             self.scalers[city] = joblib.load(scaler_path)
-            self.encoders[city] = joblib.load(encoders_path)
-            self.feature_columns[city] = joblib.load(features_path)
             
-            # Initialize Model
-            num_features = len(self.feature_columns[city])
-            model = DeepTrafficModel(num_features=num_features, hidden=512, num_layers=8).to(self.device)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            model.eval()
-            
-            self.models[city] = model
-            self._initialized = True
-            logger.info(f"✅ Loaded DeepTrafficModel for {city} (Acc: {checkpoint.get('tolerance_accuracy', 0.0):.1f}%)")
-
+        except FileNotFoundError:
+            logger.warning(f"⚠️ No weights found for {city}. Using random initialization.")
+            self.scalers[city] = None
         except Exception as e:
-            logger.error(f"❌ Failed to initialize forecaster for {city}: {e}", exc_info=True)
-            self.models[city] = None
+            logger.warning(f"❌ Could not load weights for {city}: {e}")
+            self.scalers[city] = None
 
-    def predict(self, current_readings: List[dict], city: str = "singapore") -> List[TrafficPrediction]:
+        model.eval()
+        self.models[city] = model
+        self.models[f"{city}_is_orchestrator"] = False
+        self._node_count[city] = num_nodes
+        self._initialized = True
+        logger.info(f"TrafficForecaster initialized for {city}")
+
+    def _get_residual_model(self, city: str, num_nodes: int) -> Optional[ResidualGCN]:
+        """Load ResidualGCN for city if available."""
+        if city in self._residual_models:
+            return self._residual_models[city]
+        path = self._weights_dir / f"residual_gcn_{city}_v1.pth"
+        if not path.exists():
+            return None
+        try:
+            model = ResidualGCN(num_nodes=num_nodes, in_features=13, hidden_dim=64, output_horizons=48, temporal_steps=24).to(self.device)
+            state = torch.load(path, map_location=self.device, weights_only=True)
+            model.load_state_dict(state)
+            model.eval()
+            self._residual_models[city] = model
+            return model
+        except Exception as e:
+            logger.warning("Could not load ResidualGCN for %s: %s", city, e)
+            return None
+
+    def predict(self, current_readings: list[dict], city: str = "bengaluru") -> list[TrafficPrediction]:
         """
-        Generate 12-hour forecast for each segment.
+        Generate predictions from current traffic readings.
+        Uses LightGBM baseline for q50, regime gate for residual activation; q90 = q50 + gated residual.
         """
         if not current_readings:
             return []
 
+        sorted_readings = sorted(current_readings, key=lambda r: r.get("segment_id", ""))
+        # Baseline q50 (median) per segment — used for gate and for optional q50/q90 output
+        q50_arr = self._baseline.predict_q50(sorted_readings, city)  # (N, 48)
+        baseline_q50_speeds = q50_arr.mean(axis=1).tolist() if q50_arr.size else []
+        gate_active = regime_gate_active(
+            baseline_q50_speeds,
+            sorted_readings,
+            city,
+            weights_dir=self._weights_dir,
+        )
+        residual_magnitude = 0.0
+        q90_residual_arr = np.zeros_like(q50_arr)
+        if gate_active:
+            logger.info("residual_active=True city=%s segments=%d", city, len(sorted_readings))
+            res_model = self._get_residual_model(city, len(sorted_readings))
+            if res_model is not None:
+                feats_9 = np.array([
+                    [float(r.get("speed_kmh", 30.0)), float(r.get("volume", 500)), float(r.get("occupancy", 0.1)),
+                    float(r.get("rain_intensity", 0.0)), float(r.get("weather_severity_index", 0.0)),
+                    float(r.get("event_attendance", 0)), float(r.get("holiday_intensity_score", 0.0)),
+                    float(r.get("is_peak_hour", 0.0)), float(r.get("is_weekday", 1.0))]
+                    for r in sorted_readings
+                ], dtype=np.float32)
+                enriched = enrich_spatial_features(feats_9, q50_arr, None, build_default_adjacency(len(sorted_readings)))
+                x_res = torch.FloatTensor(enriched).to(self.device).unsqueeze(0).unsqueeze(2).repeat(1, 1, 24, 1)
+                with torch.no_grad():
+                    q90_residual_arr = res_model(x_res).cpu().numpy()[0]
+                residual_magnitude = float(np.abs(q90_residual_arr).mean())
+                logger.info("residual_contribution_magnitude=%.4f", residual_magnitude)
+
+        q90_arr = q50_arr + q90_residual_arr
+
         if city not in self.models:
-            self.initialize(city)
+            logger.info(f"Lazy initializing model for {city}...")
+            num_nodes = len(current_readings)
+            self.initialize(city, num_nodes)
 
         model = self.models.get(city)
-        if model is None:
-            return self._heuristic_predict(current_readings)
+        scaler = self.scalers.get(city)
+        is_orchestrator = self.models.get(f"{city}_is_orchestrator", False)
 
+        if not model or not scaler:
+            return self._heuristic_predict_with_q50(sorted_readings, q50_arr, gate_active, residual_magnitude)
+        
+        # ── Feature Extraction ──
+        if is_orchestrator:
+            # Phase 2 Features: [hour, day_of_week, is_peak_hour, weather, rain, speed] (6 features)
+            feats = []
+            for r in sorted_readings:
+                f = [
+                    float(r.get("hour", datetime.utcnow().hour)),
+                    float(r.get("day_of_week", datetime.utcnow().weekday())),
+                    float(r.get("is_peak_hour", 0.0)),
+                    float(r.get("weather_severity_index", 0.0)),
+                    float(r.get("rain_intensity", 0.0)),
+                    float(r.get("speed_kmh", 30.0))
+                ]
+                feats.append(f)
+        else:
+            # Standard V2 Features: 9 features
+            feats = []
+            for r in sorted_readings:
+                f = [
+                    float(r.get("speed_kmh", 30.0)),
+                    float(r.get("volume", 500)),
+                    float(r.get("occupancy", 0.1)),
+                    float(r.get("rain_intensity", 0.0)),
+                    float(r.get("weather_severity_index", 0.0)),
+                    float(r.get("event_attendance", 0)),
+                    float(r.get("holiday_intensity_score", 0.0)),
+                    float(r.get("is_peak_hour", 0.0)),
+                    float(r.get("is_weekday", 1.0))
+                ]
+                feats.append(f)
+            
+        # [N, F]
+        feats_array = np.array(feats, dtype=np.float32)
+        
+        # Normalize using loaded scaler
         try:
-            results = []
-            now = datetime.utcnow()
-            
-            # Horizons: 48 x 15-minute intervals = 12 hours
-            # This produces data for the UI chart which expects 48 points.
-            # Index 0 = T+15min, Index 1 = T+30min, ... Index 47 = T+12h
-            horizons = [i * 15 for i in range(48)]  # [0, 15, 30, 45, 60, ..., 705]
-            horizon_timestamps = [now + timedelta(minutes=m) for m in horizons]
-            
-            # Prepare feature vectors
-            vectors = []
-            meta_map = [] # To map back result index -> (segment_idx, horizon_idx)
-            
-            cols = self.feature_columns[city]
-            encoders = self.encoders[city]
-            scaler = self.scalers[city]
-
-            for seg_idx, reading in enumerate(current_readings):
-                # Static features for this segment
-                road_name = reading.get("road_name", reading.get("name", "Unknown"))
-                # Fallback: try to infer road name from segment_id or use property
-                if "PIE" in road_name: road_name = "PIE" # Normalization
-                
-                # Dynamic inputs
-                rain_intensity = float(reading.get("rain_intensity", 0.0))
-                # We assume rain forecast decay? Or constant for now.
-                
-                for h_idx, ts in enumerate(horizon_timestamps):
-                    vec = self._construct_feature_vector(
-                        ts, reading, road_name, rain_intensity, cols, encoders
-                    )
-                    vectors.append(vec)
-                    meta_map.append((seg_idx, h_idx))
-
-            # Stack and Norm
-            X = np.array(vectors, dtype=np.float32)
-            X_scaled = scaler.transform(X)
-            X_tensor = torch.FloatTensor(X_scaled).to(self.device)
-            
-            # Inference
-            with torch.no_grad():
-                preds_band = model(X_tensor) # [Batch] -> Speed Bands
-                
-            # Convert Bands to Speed
-            preds_speed = self._band_to_speed(preds_band.cpu().numpy())
-            
-            # Unpack results
-            # Initialize storage
-            # segment_forecasts[seg_idx] = {0: val, 15: val, ...}
-            seg_forecasts = {i: {} for i in range(len(current_readings))}
-            
-            for i, p_val in enumerate(preds_speed):
-                s_idx, h_idx = meta_map[i]
-                minute_offset = horizons[h_idx]
-                seg_forecasts[s_idx][minute_offset] = float(p_val)
-                
-            # Build objects
-            for i, r in enumerate(current_readings):
-                f = seg_forecasts[i]
-                
-                # 48 x 15-minute intervals for UI chart (T+0, T+15, T+30 ... T+705)
-                hourly_vals = [f.get(m * 15, f.get(0, 30.0)) for m in range(48)]
-                
-                results.append(TrafficPrediction(
-                    segment_id=r.get("segment_id"),
-                    timestamp=now,
-                    predicted_speed_t15=f.get(15, 30.0),
-                    predicted_speed_t30=f.get(30, 30.0),
-                    predicted_speed_t60=f.get(60, 30.0),
-                    hourly_speeds=hourly_vals, 
-                    confidence=0.85 # High confidence in our ResNet
-                ))
-                
-            return results
-
+            feats_normalized = scaler.transform(feats_array)
         except Exception as e:
-            logger.error(f"Prediction failed: {e}", exc_info=True)
+            logger.error(f"Scaling failed: {e}")
             return self._heuristic_predict(current_readings)
-
-    def _construct_feature_vector(self, dt: datetime, reading: dict, road_name: str, rain: float, cols: list, encoders: dict) -> list:
-        """Helper to build the exact feature vector expected by the model."""
-        data = {}
-        
-        # Time
-        data['hour'] = dt.hour
-        data['day_of_week'] = dt.weekday()
-        data['month'] = dt.month
-        data['day_of_month'] = dt.day
-        data['is_weekend'] = 1 if dt.weekday() >= 5 else 0
-        
-        # Cyclical
-        data['hour_sin'] = np.sin(2 * np.pi * dt.hour / 24.0)
-        data['hour_cos'] = np.cos(2 * np.pi * dt.hour / 24.0)
-        data['dow_sin'] = np.sin(2 * np.pi * dt.weekday() / 7.0)
-        data['dow_cos'] = np.cos(2 * np.pi * dt.weekday() / 7.0)
-        
-        # Geo (From reading or default)
-        # Assuming reading has lat/lng, otherwise Singapore Center
-        data['latitude'] = float(reading.get("start_lat", 1.3521))
-        data['longitude'] = float(reading.get("start_lng", 103.8198))
-        
-        # Weather / Events
-        data['rain_intensity'] = rain
-        data['weather_main_encoded'] = 0 # Default 'Clear' if unknown or use encoders
-        # reading.get("weather") might be "Rain".
-        w_str = reading.get("weather", "Clear")
-        if 'weather_main' in encoders:
-             try: data['weather_main_encoded'] = encoders['weather_main'].transform([w_str])[0]
-             except: pass
-
-        data['special_event_encoded'] = 0
-        if 'special_event' in encoders and "special_event" in reading:
-             try: data['special_event_encoded'] = encoders['special_event'].transform([reading["special_event"]])[0]
-             except: pass
-             
-        # Road features
-        if 'road_name' in encoders:
-            try: data['road_name_encoded'] = encoders['road_name'].transform([road_name])[0]
-            except: data['road_name_encoded'] = 0 # Unknown road
             
-        if 'road_category' in encoders:
-             # Infer category
-             cat = "primary"
-             if "Expressway" in road_name or "PIE" in road_name or "AYE" in road_name: cat = "motorway"
-             try: data['road_category_encoded'] = encoders['road_category'].transform([cat])[0]
-             except: data['road_category_encoded'] = 0
+        x_node = torch.FloatTensor(feats_normalized).to(self.device).unsqueeze(0) # [1, N, F]
+        
+        # Replicate for history [1, N, T=24, F]
+        # (Assuming steady state for simplicity in live value)
+        x_input = x_node.unsqueeze(2).repeat(1, 1, 24, 1) # [1, N, 24, F]
+        x_input = x_input.contiguous()
 
-        # Construct List
-        vec = []
-        for c in cols:
-            # If feature missing, default to 0
-            vec.append(data.get(c, 0.0))
-        return vec
-
-    def _band_to_speed(self, band_array: np.ndarray) -> np.ndarray:
-        """Convert regression band (1.0-8.0) to km/h."""
-        # Band 1: 0-10 (Avg 5)
-        # Band 8: >70 (Avg 75)
-        # Linear approx: Speed = (Band - 0.5) * 10
-        return np.clip((band_array - 0.5) * 10.0, 5.0, 120.0)
-
-    def _heuristic_predict(self, readings: List[dict]) -> List[TrafficPrediction]:
-        """Fallback with realistic time-varying traffic patterns."""
+        with torch.no_grad():
+            preds = model(x_input)
+            
+        # Post-process
+        pred_numpy = preds.cpu().numpy()[0] # [N, OutputDims]
+        
+        results = []
         now = datetime.utcnow()
-        res = []
-        for r in readings:
-            base_speed = r.get("speed_kmh", 40.0)
+        
+        # Speed mean/std for inverse transform (last col for 6-feat, 0th col for 9-feat?)
+        # Phase 2 scaler: check speed index. It was last column in provided list [..., speed]
+        # But scaler fits on all cols. We need mean/scale of speed col.
+        speed_idx = 5 if is_orchestrator else 0
+        speed_mean = scaler.mean_[speed_idx]
+        speed_std = scaler.scale_[speed_idx]
+
+        for i, r in enumerate(sorted_readings):
+            if i >= len(pred_numpy):
+                break
+            p = pred_numpy[i] # [3] for orchestrator, [48] for V2
             
-            # Generate 48 x 15-minute intervals with realistic traffic patterns
-            hourly_speeds = []
-            for i in range(48):
-                future_time = now + timedelta(minutes=i * 15)
-                hour = future_time.hour
-                
-                # Traffic pattern: Singapore rush hours are 7-9 AM and 5-8 PM
-                # Normalize pattern as a multiplier (0.6 = congested, 1.0 = free flow)
-                if 7 <= hour <= 9:  # Morning rush
-                    pattern = 0.55 + 0.05 * np.random.random()
-                elif 17 <= hour <= 20:  # Evening rush
-                    pattern = 0.50 + 0.05 * np.random.random()
-                elif 10 <= hour <= 16:  # Midday (moderate)
-                    pattern = 0.75 + 0.10 * np.random.random()
-                elif 21 <= hour <= 23:  # Late evening
-                    pattern = 0.85 + 0.10 * np.random.random()
-                else:  # Night/early morning (free flow)
-                    pattern = 0.95 + 0.05 * np.random.random()
-                
-                # Apply pattern with some segment-specific variation
-                segment_variance = 0.9 + 0.2 * np.random.random()
-                predicted_speed = base_speed * pattern * segment_variance
-                hourly_speeds.append(round(max(5.0, min(120.0, predicted_speed)), 2))
+            # Inverse transform
+            p = p * speed_std + speed_mean
             
-            res.append(TrafficPrediction(
-                segment_id=r.get("segment_id", "u"),
+            # If orchestrator (3 horizons), interpolate to 48 horizons (12h)
+            if is_orchestrator:
+                # p has [1h, 6h, 24h] forecast
+                # We need 48 points (every 15m for 12h)
+                # T+1h=index 4, T+6h=index 24, T+12h=? 
+                # Let's do linear interpolation
+                val_1h = p[0]
+                val_6h = p[1]
+                val_24h = p[2]
+                
+                # Create 48 points
+                # 0..4 (0-1h): Interp(current, 1h)
+                # 4..24 (1h-6h): Interp(1h, 6h)
+                # 24..48 (6h-12h): Interp(6h, 24h)
+                
+                current_speed = float(r.get("speed_kmh", 30.0))
+                interpolated = []
+                
+                # 0 to 4 (1h)
+                for step in range(4):
+                    frac = (step + 1) / 4
+                    interpolated.append(current_speed + frac * (val_1h - current_speed))
+                    
+                # 4 to 24 (1h to 6h) -> 20 steps
+                for step in range(20):
+                    frac = (step + 1) / 20
+                    interpolated.append(val_1h + frac * (val_6h - val_1h))
+                    
+                # 24 to 48 (6h to 12h) -> 24 steps
+                # Note: val_24h is at T+24h, we only go to T+12h
+                # We interpolate towards 24h but stop halfway
+                val_12h_est = val_6h + (12-6)/(24-6) * (val_24h - val_6h)
+                
+                for step in range(24):
+                    frac = (step + 1) / 24
+                    interpolated.append(val_6h + frac * (val_12h_est - val_6h))
+                
+                primary = interpolated
+            else:
+                primary = [float(x) for x in p]
+
+            # Construct Result
+            q50_row = q50_arr[i] if i < len(q50_arr) else primary
+            q90_row = q90_arr[i] if i < len(q90_arr) else q50_row
+            
+            # Confidence calculation
+            spread = np.abs(np.array(q90_row) - np.array(q50_row)).mean() if len(q90_row) == len(q50_row) else 0
+            if is_orchestrator:
+                # Orchestrator doesn't have q90 from this model output directly (unless using residual separately)
+                # We can fallback to heuristic confidence
+                confidence = 0.75
+            else:
+                confidence = float(max(0.0, min(1.0, 1.0 - spread / (np.mean(q50_row) + 1e-5))))
+
+            results.append(TrafficPrediction(
+                segment_id=r.get("segment_id"),
                 timestamp=now,
-                predicted_speed_t15=hourly_speeds[1] if len(hourly_speeds) > 1 else base_speed,
-                predicted_speed_t30=hourly_speeds[2] if len(hourly_speeds) > 2 else base_speed,
-                predicted_speed_t60=hourly_speeds[4] if len(hourly_speeds) > 4 else base_speed,
-                hourly_speeds=hourly_speeds,
-                confidence=0.75
+                predicted_speed_t15=float(primary[0]),
+                predicted_speed_t30=float(primary[1]),
+                predicted_speed_t60=float(primary[3]),
+                hourly_speeds=[float(x) for x in primary],
+                confidence=round(confidence, 2),
+                hourly_speeds_q50=[float(x) for x in primary], # Using primary as q50 for now
+                hourly_speeds_q90=[float(x) for x in primary], # Fallback until residual connected
             ))
-        return res
+        return results
+
+    def _heuristic_predict_with_q50(
+        self,
+        sorted_readings: list[dict],
+        q50_arr: np.ndarray,
+        gate_active: bool,
+        residual_magnitude: float,
+    ) -> list[TrafficPrediction]:
+        """Fallback when ST-GCN not available; use baseline q50 when present."""
+        now = datetime.utcnow()
+        q90_arr = q50_arr + np.zeros_like(q50_arr) if q50_arr is not None and q50_arr.size else None
+        predictions = []
+        for i, r in enumerate(sorted_readings):
+            if q50_arr is not None and i < len(q50_arr):
+                speeds = [float(x) for x in q50_arr[i]]
+                q90_row = [float(x) for x in (q90_arr[i] if q90_arr is not None and i < len(q90_arr) else q50_arr[i])]
+            else:
+                speed = float(r.get("speed_kmh", r.get("speed", 30.0)))
+                speeds = [speed] * 48
+                q90_row = None
+            predictions.append(TrafficPrediction(
+                segment_id=r.get("segment_id", "unknown"),
+                timestamp=now,
+                predicted_speed_t15=speeds[0],
+                predicted_speed_t30=speeds[1] if len(speeds) > 1 else speeds[0],
+                predicted_speed_t60=speeds[3] if len(speeds) > 3 else speeds[0],
+                hourly_speeds=speeds,
+                confidence=0.5,
+                hourly_speeds_q50=speeds if q50_arr is not None else None,
+                hourly_speeds_q90=q90_row,
+            ))
+        return predictions
+
+    def _heuristic_predict(self, readings: list[dict]) -> list[TrafficPrediction]:
+        """Fallback heuristic prediction (no baseline dependency)."""
+        now = datetime.utcnow()
+        predictions = []
+        for r in readings:
+            speed = r.get("speed_kmh", 30.0)
+            predictions.append(TrafficPrediction(
+                segment_id=r.get("segment_id", "unknown"),
+                timestamp=now,
+                predicted_speed_t15=speed,
+                predicted_speed_t30=speed,
+                predicted_speed_t60=speed,
+                hourly_speeds=[speed] * 48,
+                confidence=0.5,
+            ))
+        return predictions
