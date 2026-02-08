@@ -4,8 +4,11 @@
     position: fixed;
     bottom: 24px;
     right: 24px;
-    z-index: 1000;
+    z-index: 9999;
+    /* Ensure high visibility above map layers */
     font-family: 'Inter', -apple-system, sans-serif;
+    pointer-events: auto;
+    /* Ensure clicks are captured */
 }
 
 /* Floating Action Button */
