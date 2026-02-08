@@ -19,6 +19,16 @@ logger = logging.getLogger("neuroflow.data_generator")
 
 # ── City Configurations ──
 CITY_CONFIGS = {
+    "singapore": {
+        "center": {"lat": 1.3521, "lng": 103.8198},
+        "radius_km": 20,
+        "segments": 100,
+        "patterns": {
+            "morning_rush_start": 7, "morning_rush_end": 10,
+            "evening_rush_start": 17, "evening_rush_end": 20,
+            "rain_prob": 0.5, "rain_impact": 0.30,
+        }
+    },
     "bengaluru": {
         "center": {"lat": 12.9716, "lng": 77.5946},
         "radius_km": 15,

@@ -29,9 +29,9 @@ class Settings(BaseSettings):
         default="cuda", description="Device for PyTorch inference"
     )
 
-    # ── Bengaluru Pilot Zone ──
-    bengaluru_center_lat: float = Field(default=12.9716)
-    bengaluru_center_lng: float = Field(default=77.5946)
+    # ── Singapore Pilot Zone ──
+    singapore_center_lat: float = Field(default=1.3521)
+    singapore_center_lng: float = Field(default=103.8198)
 
     # ── Singapore Zone ──
     singapore_center_lat: float = Field(default=1.3521)

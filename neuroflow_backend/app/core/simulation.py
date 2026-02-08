@@ -66,7 +66,7 @@ class SimulationLoop:
         # Get segment IDs from graph for data replay
         graph = self.graph_service.get_graph()
         segment_ids = [
-            f"{u}-{v}-{k}"
+            f"singapore_{u}-{v}-{k}"
             for u, v, k in list(graph.edges(keys=True))[:200]  # Limit for performance
         ]
 
