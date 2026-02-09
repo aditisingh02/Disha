@@ -1,342 +1,481 @@
 /* Camera Panel Styles */
 
 .camera-panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 400px;
-    height: 100vh;
-    background: rgba(15, 23, 42, 0.98);
-    backdrop-filter: blur(20px);
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    flex-direction: column;
-    z-index: 1000;
-    animation: slideIn 0.3s ease;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.98);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
 }
 
 @keyframes slideIn {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
 
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Header */
 .camera-panel__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
 }
 
 .camera-panel__title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: white;
-    font-size: 16px;
-    font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .camera-panel__close {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
 .camera-panel__close:hover {
-    background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Camera Info */
 .camera-panel__info {
-    padding: 16px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .camera-panel__location {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: white;
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
 .camera-panel__meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .camera-panel__id {
-    font-family: monospace;
-    font-size: 11px;
-    color: #64748b;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 2px 8px;
-    border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
 .camera-panel__time {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #64748b;
 }
 
 /* Image Viewer */
 .camera-panel__viewer {
-    position: relative;
-    flex-shrink: 0;
-    height: 280px;
-    background: #0f172a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  height: 280px;
+  background: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .camera-panel__image {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .camera-panel__error {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    color: #64748b;
-    text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #64748b;
+  text-align: center;
 }
 
 .camera-panel__error h3 {
-    margin: 0;
-    font-size: 16px;
-    color: #94a3b8;
+  margin: 0;
+  font-size: 16px;
+  color: #94a3b8;
 }
 
 .camera-panel__error p {
-    margin: 0;
-    font-size: 12px;
+  margin: 0;
+  font-size: 12px;
 }
 
 .camera-panel__error button {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .camera-panel__error button:hover:not(:disabled) {
-    background: #2563eb;
+  background: #2563eb;
 }
 
 /* Navigation Arrows */
 .camera-panel__nav {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.6);
-    border: none;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(8px);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
 }
 
 .camera-panel__nav:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.8);
 }
 
 .camera-panel__nav:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .camera-panel__nav--prev {
-    left: 12px;
+  left: 12px;
 }
 
 .camera-panel__nav--next {
-    right: 12px;
+  right: 12px;
 }
 
 /* Actions */
 .camera-panel__actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .camera-panel__refresh {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: rgba(59, 130, 246, 0.2);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .camera-panel__refresh:hover:not(:disabled) {
-    background: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.3);
 }
 
 .camera-panel__counter {
-    font-size: 12px;
-    color: #64748b;
+  font-size: 12px;
+  color: #64748b;
 }
 
 /* Spinning animation */
 .spinning {
-    animation: spin 1s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
+  from {
+    transform: rotate(0deg);
+  }
 
-    to {
-        transform: rotate(360deg);
-    }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Analyze Button */
+.camera-panel__analyze {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.camera-panel__analyze:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.3);
+}
+
+.camera-panel__analyze:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Vehicle Analysis Section */
+.camera-panel__analysis {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.camera-panel__analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.camera-panel__analysis-time {
+  margin-left: auto;
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+/* Congestion Meter */
+.camera-panel__congestion {
+  margin-bottom: 16px;
+}
+
+.camera-panel__congestion-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.camera-panel__congestion-level {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.camera-panel__congestion-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.camera-panel__congestion-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition:
+    width 0.5s ease,
+    background-color 0.3s ease;
+}
+
+.camera-panel__congestion-score {
+  text-align: right;
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Vehicle Counts Grid */
+.camera-panel__vehicles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.camera-panel__vehicle-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.camera-panel__vehicle-item svg {
+  color: #60a5fa;
+}
+
+.camera-panel__vehicle-count {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+}
+
+.camera-panel__vehicle-label {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.camera-panel__total-vehicles {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.camera-panel__total-vehicles strong {
+  color: white;
+  font-size: 14px;
 }
 
 /* Camera List */
 .camera-panel__list {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .camera-panel__list-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 20px;
-    color: #94a3b8;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .camera-panel__list-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
 }
 
 .camera-panel__list-item {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    margin-bottom: 4px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    color: #cbd5e1;
-    font-size: 12px;
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .camera-panel__list-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .camera-panel__list-item.active {
-    background: rgba(59, 130, 246, 0.2);
-    border-color: #3b82f6;
-    color: white;
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: white;
 }
 
 .camera-panel__list-idx {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: 600;
-    color: #64748b;
-    flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  flex-shrink: 0;
 }
 
 .camera-panel__list-item.active .camera-panel__list-idx {
-    background: #3b82f6;
-    color: white;
+  background: #3b82f6;
+  color: white;
 }
 
 .camera-panel__list-desc {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Scrollbar */
 .camera-panel__list-scroll::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .camera-panel__list-scroll::-webkit-scrollbar-track {
-    background: transparent;
+  background: transparent;
 }
 
 .camera-panel__list-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .camera-panel__list-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.3);
 }

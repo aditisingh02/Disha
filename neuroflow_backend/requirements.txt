@@ -30,3 +30,7 @@ scipy
 # ── Utilities ──
 orjson
 httpx
+
+# ── Vehicle Detection (YOLO) ──
+ultralytics
+Pillow

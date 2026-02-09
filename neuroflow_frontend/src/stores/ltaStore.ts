@@ -46,6 +46,23 @@ export interface LTAStatus {
     error?: string;
 }
 
+export interface VehicleCounts {
+    car: number;
+    motorcycle: number;
+    bus: number;
+    truck: number;
+}
+
+export interface VehicleAnalysis {
+    camera_id: string;
+    vehicle_counts: VehicleCounts;
+    total_vehicles: number;
+    congestion_score: number;
+    congestion_level: 'low' | 'medium' | 'high' | 'severe';
+    analyzed_at: string;
+    processing_time_ms: number;
+}
+
 interface LTAState {
     // Data
     cameras: TrafficCamera[];
@@ -62,6 +79,10 @@ interface LTAState {
     showSpeedBands: boolean;
     showIncidents: boolean;
 
+    // Camera Analysis
+    cameraAnalysis: Record<string, VehicleAnalysis>;
+    isAnalyzing: boolean;
+
     // Actions
     fetchCameras: () => Promise<void>;
     fetchSpeedBands: () => Promise<void>;
@@ -72,6 +93,7 @@ interface LTAState {
     toggleCameraPanel: () => void;
     toggleSpeedBands: () => void;
     toggleIncidents: () => void;
+    analyzeCamera: (cameraId: string) => Promise<VehicleAnalysis | null>;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -95,6 +117,8 @@ export const useLTAStore = create<LTAState>((set) => ({
     isCameraPanelOpen: false,
     showSpeedBands: true,
     showIncidents: true,
+    cameraAnalysis: {},
+    isAnalyzing: false,
 
     // Fetch all cameras
     fetchCameras: async () => {
@@ -179,5 +203,26 @@ export const useLTAStore = create<LTAState>((set) => ({
     // Toggle incidents visibility
     toggleIncidents: () => {
         set((state) => ({ showIncidents: !state.showIncidents }));
+    },
+
+    // Analyze camera image with YOLO
+    analyzeCamera: async (cameraId: string) => {
+        set({ isAnalyzing: true });
+        try {
+            const response = await fetch(
+                `${API_BASE}/api/v1/lta/cameras/${cameraId}/analyze`
+            );
+            if (!response.ok) throw new Error('Failed to analyze camera');
+            const analysis = await response.json();
+            set((state) => ({
+                cameraAnalysis: { ...state.cameraAnalysis, [cameraId]: analysis },
+                isAnalyzing: false,
+            }));
+            return analysis;
+        } catch (error) {
+            console.error('[LTA] Failed to analyze camera:', error);
+            set({ isAnalyzing: false });
+            return null;
+        }
     },
 }));

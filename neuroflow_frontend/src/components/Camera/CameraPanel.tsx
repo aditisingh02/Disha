@@ -4,8 +4,8 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { X, RefreshCw, MapPin, Clock, Camera, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
-import { useLTAStore } from '@/stores/ltaStore';
+import { X, RefreshCw, MapPin, Clock, Camera, ChevronLeft, ChevronRight, AlertCircle, Car, Truck, Bus, Bike, Activity } from 'lucide-react';
+import { useLTAStore, VehicleAnalysis } from '@/stores/ltaStore';
 import './CameraPanel.css';
 
 export default function CameraPanel() {
@@ -15,7 +15,10 @@ export default function CameraPanel() {
         isCameraPanelOpen,
         selectCamera,
         toggleCameraPanel,
-        fetchCameras
+        fetchCameras,
+        analyzeCamera,
+        cameraAnalysis,
+        isAnalyzing
     } = useLTAStore();
 
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -35,6 +38,29 @@ export default function CameraPanel() {
         setLastRefresh(new Date());
         setIsRefreshing(false);
     }, [fetchCameras]);
+
+    // Analyze camera with YOLO
+    const handleAnalyze = useCallback(async () => {
+        if (selectedCamera) {
+            await analyzeCamera(selectedCamera.id);
+        }
+    }, [selectedCamera, analyzeCamera]);
+
+    // Get current analysis for selected camera
+    const currentAnalysis: VehicleAnalysis | null = selectedCamera 
+        ? cameraAnalysis[selectedCamera.id] || null 
+        : null;
+
+    // Congestion level colors
+    const getCongestionColor = (level: string) => {
+        switch (level) {
+            case 'low': return '#22c55e';
+            case 'medium': return '#f59e0b';
+            case 'high': return '#ef4444';
+            case 'severe': return '#7f1d1d';
+            default: return '#6b7280';
+        }
+    };
 
     // Navigate to previous/next camera
     const goToPrev = useCallback(() => {
@@ -164,10 +190,92 @@ export default function CameraPanel() {
                     <RefreshCw size={16} className={isRefreshing ? 'spinning' : ''} />
                     {isRefreshing ? 'Refreshing...' : 'Refresh Image'}
                 </button>
+                <button
+                    className="camera-panel__analyze"
+                    onClick={handleAnalyze}
+                    disabled={isAnalyzing}
+                >
+                    <Activity size={16} className={isAnalyzing ? 'spinning' : ''} />
+                    {isAnalyzing ? 'Analyzing...' : 'Analyze Traffic'}
+                </button>
                 <div className="camera-panel__counter">
                     {currentIndex + 1} / {cameras.length}
                 </div>
             </div>
+
+            {/* Vehicle Analysis Results */}
+            {currentAnalysis && (
+                <div className="camera-panel__analysis">
+                    <div className="camera-panel__analysis-header">
+                        <Activity size={14} />
+                        <span>Traffic Analysis</span>
+                        <span className="camera-panel__analysis-time">
+                            {currentAnalysis.processing_time_ms}ms
+                        </span>
+                    </div>
+                    
+                    {/* Congestion Meter */}
+                    <div className="camera-panel__congestion">
+                        <div className="camera-panel__congestion-label">
+                            <span>Congestion</span>
+                            <span 
+                                className="camera-panel__congestion-level"
+                                style={{ color: getCongestionColor(currentAnalysis.congestion_level) }}
+                            >
+                                {currentAnalysis.congestion_level.toUpperCase()}
+                            </span>
+                        </div>
+                        <div className="camera-panel__congestion-bar">
+                            <div 
+                                className="camera-panel__congestion-fill"
+                                style={{ 
+                                    width: `${currentAnalysis.congestion_score}%`,
+                                    backgroundColor: getCongestionColor(currentAnalysis.congestion_level)
+                                }}
+                            />
+                        </div>
+                        <div className="camera-panel__congestion-score">
+                            {currentAnalysis.congestion_score}%
+                        </div>
+                    </div>
+
+                    {/* Vehicle Counts */}
+                    <div className="camera-panel__vehicles">
+                        <div className="camera-panel__vehicle-item">
+                            <Car size={18} />
+                            <span className="camera-panel__vehicle-count">
+                                {currentAnalysis.vehicle_counts.car}
+                            </span>
+                            <span className="camera-panel__vehicle-label">Cars</span>
+                        </div>
+                        <div className="camera-panel__vehicle-item">
+                            <Truck size={18} />
+                            <span className="camera-panel__vehicle-count">
+                                {currentAnalysis.vehicle_counts.truck}
+                            </span>
+                            <span className="camera-panel__vehicle-label">Trucks</span>
+                        </div>
+                        <div className="camera-panel__vehicle-item">
+                            <Bus size={18} />
+                            <span className="camera-panel__vehicle-count">
+                                {currentAnalysis.vehicle_counts.bus}
+                            </span>
+                            <span className="camera-panel__vehicle-label">Buses</span>
+                        </div>
+                        <div className="camera-panel__vehicle-item">
+                            <Bike size={18} />
+                            <span className="camera-panel__vehicle-count">
+                                {currentAnalysis.vehicle_counts.motorcycle}
+                            </span>
+                            <span className="camera-panel__vehicle-label">Bikes</span>
+                        </div>
+                    </div>
+
+                    <div className="camera-panel__total-vehicles">
+                        Total Vehicles: <strong>{currentAnalysis.total_vehicles}</strong>
+                    </div>
+                </div>
+            )}
 
             {/* Camera List */}
             <div className="camera-panel__list">

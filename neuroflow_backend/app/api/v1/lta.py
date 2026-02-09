@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 
 from app.services.lta_client import lta_client
+from app.services.vehicle_detector import vehicle_detector
 
 logger = logging.getLogger("neuroflow.lta.api")
 
@@ -46,6 +47,23 @@ class IncidentResponse(BaseModel):
     longitude: float
     message: str
     fetched_at: str
+
+
+class VehicleCountsResponse(BaseModel):
+    car: int = 0
+    motorcycle: int = 0
+    bus: int = 0
+    truck: int = 0
+
+
+class VehicleAnalysisResponse(BaseModel):
+    camera_id: str
+    vehicle_counts: VehicleCountsResponse
+    total_vehicles: int
+    congestion_score: int
+    congestion_level: str
+    analyzed_at: str
+    processing_time_ms: int
 
 
 class TravelTimeResponse(BaseModel):
@@ -112,6 +130,38 @@ async def get_cameras_near(
     """
     cameras = await lta_client.get_cameras_near(lat, lng, radius_km)
     return cameras
+
+
+@router.get("/cameras/{camera_id}/analyze", response_model=VehicleAnalysisResponse)
+async def analyze_camera(camera_id: str):
+    """
+    Analyze a traffic camera image using YOLO for vehicle detection.
+    
+    Returns:
+    - **vehicle_counts**: Count of each vehicle type (car, motorcycle, bus, truck)
+    - **total_vehicles**: Total number of vehicles detected
+    - **congestion_score**: 0-100 score indicating traffic density
+    - **congestion_level**: low, medium, high, or severe
+    - **processing_time_ms**: Time taken to analyze the image
+    
+    Results are cached for 30 seconds to avoid re-processing.
+    """
+    # Get camera details first
+    camera = await lta_client.get_camera_by_id(camera_id)
+    if not camera:
+        raise HTTPException(status_code=404, detail=f"Camera {camera_id} not found")
+    
+    try:
+        # Analyze the camera image
+        result = await vehicle_detector.analyze_camera(
+            camera_id=camera_id,
+            image_url=camera["image_url"]
+        )
+        return result.to_dict()
+    except Exception as e:
+        logger.error(f"Failed to analyze camera {camera_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
 
 
 @router.get("/speedbands", response_model=list[SpeedBandResponse])
