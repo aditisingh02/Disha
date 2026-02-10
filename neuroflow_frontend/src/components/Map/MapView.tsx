@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
-import { GoogleMap, LoadScript, Marker, Polyline } from '@react-google-maps/api';
+import { GoogleMap, LoadScript, Marker, Polyline, OverlayView } from '@react-google-maps/api';
 import { useMapStore } from '@/stores/mapStore';
 import { useRouteStore } from '@/stores/routeStore';
 import { GOOGLE_MAPS_API_KEY } from '@/utils/constants';
@@ -52,9 +52,12 @@ interface RouteSegment {
   path: google.maps.LatLng[];
   color: string;
   isMainRoute: boolean;
+  routeIndex: number;
+  durationText?: string;
 }
 
 export default function MapView() {
+  // ... (store hooks unchanged) ...
   const viewState = useMapStore((s) => s.viewState);
   const pickMode = useMapStore((s) => s.pickMode);
   const setPickMode = useMapStore((s) => s.setPickMode);
@@ -70,8 +73,15 @@ export default function MapView() {
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
+  const [selectedRouteInfo, setSelectedRouteInfo] = useState<{ 
+    routeIndex: number; 
+    latLng: google.maps.LatLng; 
+    duration: string;
+    isMain: boolean;
+  } | null>(null);
   const [apiLoaded, setApiLoaded] = useState(false);
   const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
+  const clickLockRef = useRef(false); // Prevents multiple overlapping click handlers
 
   const center = useMemo(() => ({
     lat: viewState.latitude,
@@ -120,175 +130,344 @@ export default function MapView() {
         // Google Maps Directions API: departureTime (now or future) + trafficModel required for duration_in_traffic
         const now = new Date();
         directionsServiceRef.current.route(
-      {
-        origin: { lat: origin[0], lng: origin[1] },
-        destination: { lat: destination[0], lng: destination[1] },
-        travelMode: google.maps.TravelMode.DRIVING,
-        provideRouteAlternatives: false,
-        drivingOptions: {
-          departureTime: now,
-          trafficModel: google.maps.TrafficModel.BEST_GUESS,
-        },
-      },
-      (result, status) => {
-        // Always clear computing state so dashboard and Sidebar stay in sync (Google Maps API compliance)
-        const clearComputing = () => {
-          setComputingRoute(false);
-        };
+          {
+            origin: { lat: origin[0], lng: origin[1] },
+            destination: { lat: destination[0], lng: destination[1] },
+            travelMode: google.maps.TravelMode.DRIVING,
+            provideRouteAlternatives: true, // Enable alternative routes
+            drivingOptions: {
+              departureTime: now,
+              trafficModel: google.maps.TrafficModel.BEST_GUESS,
+            },
+          },
+          (result, status) => {
+            // Always clear computing state so dashboard and Sidebar stay in sync (Google Maps API compliance)
+            const clearComputing = () => {
+              setComputingRoute(false);
+            };
 
-        if (status !== google.maps.DirectionsStatus.OK || !result) {
-          console.error('[MapView] ❌ Directions failed:', status);
-          setRouteSegments([]);
-          setGoogleRoute(null);
-          setError(`Route calculation failed: ${status}`);
-          clearComputing();
-          return;
-        }
+            if (status !== google.maps.DirectionsStatus.OK || !result) {
+              console.error('[MapView] ❌ Directions failed:', status);
+              setRouteSegments([]);
+              setGoogleRoute(null);
+              setError(`Route calculation failed: ${status}`);
+              clearComputing();
+              return;
+            }
 
-        console.log('[MapView] ✅ Directions loaded, processing...');
+            console.log(`[MapView] ✅ Directions loaded. Found ${result.routes.length} routes.`);
 
-        const route = result.routes[0];
-        if (!route || !route.legs || !route.legs[0]) {
-          setRouteSegments([]);
-          setGoogleRoute(null);
-          setError('Invalid route data received');
-          clearComputing();
-          return;
-        }
+            // Process ALL routes (Main + Alternatives)
+            const segments: RouteSegment[] = [];
 
-        const leg = route.legs[0];
-        const segments: RouteSegment[] = [];
+            // Limit to Top 3 Routes (Main + 2 Alternatives) to avoid clutter
+            result.routes.slice(0, 3).forEach((route, routeIndex) => {
+                if (!route.legs || !route.legs[0]) return;
+                
+                const leg = route.legs[0];
+                const isMain = routeIndex === 0; // First route is main
+                const durationText = leg.duration?.text || '';
 
-        // Process each step and color based on traffic
-        leg.steps.forEach((step) => {
-          const baseDuration = step.duration?.value || 1;
-          const overallRatio = (leg.duration_in_traffic?.value || leg.duration?.value || baseDuration) / (leg.duration?.value || baseDuration);
-          const estimatedTrafficDuration = baseDuration * overallRatio;
-          const color = getTrafficColor(baseDuration, estimatedTrafficDuration);
-
-          segments.push({
-            path: step.path || [],
-            color,
-            isMainRoute: true,
-          });
-        });
-
-        setRouteSegments(segments);
-
-        // Push real route data to the store for Sidebar to consume
-        setGoogleRoute({
-          distance: leg.distance?.text || '',
-          duration: leg.duration?.text || '',
-          durationInTraffic: leg.duration_in_traffic?.text,
-          distanceMeters: leg.distance?.value || 0,
-          durationSeconds: leg.duration?.value || 0,
-          durationInTrafficSeconds: leg.duration_in_traffic?.value,
-        });
-
-        // Fetch route-specific forecast from ST-GCN model
-        import('@/utils/api').then(({ getRouteForecast, getOrchestratorRouteForecast }) => {
-          import('@/stores/trafficStore').then(({ useTrafficStore }) => {
-            const setRouteForecast = useTrafficStore.getState().setRouteForecast;
-            const setOrchestratorRouteForecast = useTrafficStore.getState().setOrchestratorRouteForecast;
-            getRouteForecast(
-              [origin![0], origin![1]],
-              [destination![0], destination![1]],
-              'singapore'
-            ).then(forecast => {
-              console.log('[MapView] 🔮 Route forecast received:', forecast);
-              setRouteForecast(forecast);
-            }).catch(err => {
-              console.error('[MapView] ❌ Forecast fetch failed:', err);
+                if (isMain) {
+                    // Main Route: Keep granular steps for Traffic Colors
+                    leg.steps.forEach((step) => {
+                      const baseDuration = step.duration?.value || 1;
+                      const overallRatio = (leg.duration_in_traffic?.value || leg.duration?.value || baseDuration) / (leg.duration?.value || baseDuration);
+                      const estimatedTrafficDuration = baseDuration * overallRatio;
+                      
+                      segments.push({
+                        path: step.path || [],
+                        color: getTrafficColor(baseDuration, estimatedTrafficDuration),
+                        isMainRoute: true,
+                        routeIndex,
+                        durationText,
+                      });
+                    });
+                } else {
+                    // Alternative Route: Merge all steps into SINGLE path for cleaner rendering
+                    const fullPath: google.maps.LatLng[] = [];
+                    leg.steps.forEach((step) => {
+                        if (step.path) fullPath.push(...step.path);
+                    });
+                    
+                    segments.push({
+                        path: fullPath,
+                        color: '#4b5563', // Dark Grey default
+                        isMainRoute: false,
+                        routeIndex,
+                        durationText,
+                    });
+                }
             });
-            // Same output as terminal CLI: multi-horizon, congestion level, risk, routes (for Forecast modal)
-            getOrchestratorRouteForecast({
-              origin_lat: origin![0],
-              origin_lon: origin![1],
-              destination_lat: destination![0],
-              destination_lon: destination![1],
-            }).then(orch => {
-              if (!orch.error) {
-                console.log('[MapView] 📊 Orchestrator route forecast (terminal-equivalent):', orch);
-                setOrchestratorRouteForecast(orch);
-              } else {
-                setOrchestratorRouteForecast(null);
-              }
-            }).catch(() => setOrchestratorRouteForecast(null));
-          });
-        });
 
-        // Fit map to route bounds
-        if (map && route.bounds) {
-          map.fitBounds(route.bounds, 50);
+            // Sort segments so main route is drawn LAST (on top)
+            segments.sort((a, b) => (a.isMainRoute === b.isMainRoute ? 0 : a.isMainRoute ? 1 : -1));
+
+            setRouteSegments(segments);
+
+            // Push PRIMARY route data to store for statistics
+            const primaryLeg = result.routes[0].legs[0];
+            setGoogleRoute({
+              distance: primaryLeg.distance?.text || '',
+              duration: primaryLeg.duration?.text || '',
+              durationInTraffic: primaryLeg.duration_in_traffic?.text,
+              distanceMeters: primaryLeg.distance?.value || 0,
+              durationSeconds: primaryLeg.duration?.value || 0,
+              durationInTrafficSeconds: primaryLeg.duration_in_traffic?.value,
+            });
+
+            // Fetch route-specific forecast from ST-GCN model
+            import('@/utils/api').then(({ getRouteForecast, getOrchestratorRouteForecast }) => {
+              import('@/stores/trafficStore').then(({ useTrafficStore }) => {
+                const setRouteForecast = useTrafficStore.getState().setRouteForecast;
+                const setOrchestratorRouteForecast = useTrafficStore.getState().setOrchestratorRouteForecast;
+                getRouteForecast(
+                  [origin![0], origin![1]],
+                  [destination![0], destination![1]],
+                  'singapore'
+                ).then(forecast => {
+                  console.log('[MapView] 🔮 Route forecast received:', forecast);
+                  setRouteForecast(forecast);
+                }).catch(err => {
+                  console.error('[MapView] ❌ Forecast fetch failed:', err);
+                });
+                // Same output as terminal CLI: multi-horizon, congestion level, risk, routes (for Forecast modal)
+                getOrchestratorRouteForecast({
+                  origin_lat: origin![0],
+                  origin_lon: origin![1],
+                  destination_lat: destination![0],
+                  destination_lon: destination![1],
+                }).then(orch => {
+                  if (!orch.error) {
+                    console.log('[MapView] 📊 Orchestrator route forecast (terminal-equivalent):', orch);
+                    setOrchestratorRouteForecast(orch);
+                  } else {
+                    setOrchestratorRouteForecast(null);
+                  }
+                }).catch(() => setOrchestratorRouteForecast(null));
+              });
+            });
+
+            // Fit map to route bounds
+            if (map && result.routes[0].bounds) {
+              map.fitBounds(result.routes[0].bounds, 50);
+            }
+
+            console.log('[MapView] ✅ Route data pushed to store');
+          }
+        );
+      }, [origin, destination, map, setGoogleRoute, setComputingRoute, setError]);
+    
+      const onLoad = useCallback((mapInstance: google.maps.Map) => {
+        setMap(mapInstance);
+      }, []);
+    
+      const handleApiLoad = useCallback(() => {
+        console.log('[MapView] ✅ Google Maps API loaded');
+        setApiLoaded(true);
+      }, []);
+    
+      const handleClick = useCallback((e: google.maps.MapMouseEvent) => {
+        if (!e.latLng || !pickMode) return;
+    
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+    
+        console.log('[MapView] 📍 Setting', pickMode, 'to', lat.toFixed(4), lng.toFixed(4));
+    
+        if (pickMode === 'origin') {
+          setOrigin([lat, lng]);
+          setPickMode('destination');
+        } else {
+          setDestination([lat, lng]);
+          setPickMode(null);
         }
+      }, [pickMode, setOrigin, setDestination, setPickMode]);
 
-        console.log('[MapView] ✅ Route data pushed to store');
-      }
-    );
-  }, [origin, destination, map, setGoogleRoute, setComputingRoute, setError]);
-
-  const onLoad = useCallback((mapInstance: google.maps.Map) => {
-    setMap(mapInstance);
-  }, []);
-
-  const handleApiLoad = useCallback(() => {
-    console.log('[MapView] ✅ Google Maps API loaded');
-    setApiLoaded(true);
-  }, []);
-
-  const handleClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (!e.latLng || !pickMode) return;
-
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
-
-    console.log('[MapView] 📍 Setting', pickMode, 'to', lat.toFixed(4), lng.toFixed(4));
-
-    if (pickMode === 'origin') {
-      setOrigin([lat, lng]);
-      setPickMode('destination');
-    } else {
-      setDestination([lat, lng]);
-      setPickMode(null);
-    }
-  }, [pickMode, setOrigin, setDestination, setPickMode]);
-
-  return (
-    <div className="relative w-full h-full">
-      <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} onLoad={handleApiLoad}>
-        <GoogleMap
-          mapContainerStyle={containerStyle}
-          center={center}
-          zoom={viewState.zoom}
-          options={mapOptions}
-          onLoad={onLoad}
-          onClick={handleClick}
-        >
-          {/* Traffic-colored route segments */}
-          {routeSegments.map((segment, index) => (
+      // Handler for clicking on a route to show/hide tooltip
+      const handleRouteClick = useCallback((e: google.maps.MapMouseEvent, segment: RouteSegment, segmentKey: string) => {
+        // Stop event propagation
+        if (e.stop) e.stop();
+        
+        // Prevent multiple overlapping segment clicks (critical fix for double tooltip)
+        if (clickLockRef.current) return;
+        clickLockRef.current = true;
+        setTimeout(() => { clickLockRef.current = false; }, 100);
+        
+        if (!e.latLng) return;
+        
+        // Toggle: if clicking the same route type (main/alt), close tooltip
+        const isSameRouteType = selectedRouteInfo?.isMain === segment.isMainRoute && 
+                                 selectedRouteInfo?.routeIndex === segment.routeIndex;
+        
+        if (isSameRouteType) {
+          setSelectedRouteInfo(null);
+        } else {
+          setSelectedRouteInfo({
+            routeIndex: segment.routeIndex,
+            latLng: e.latLng,
+            duration: segment.durationText || 'Calculating...',
+            isMain: segment.isMainRoute,
+          });
+        }
+      }, [selectedRouteInfo]);
+    
+      return (
+        <div className="relative w-full h-full">
+          <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} onLoad={handleApiLoad}>
+            <GoogleMap
+              mapContainerStyle={containerStyle}
+              center={center}
+              zoom={viewState.zoom}
+              options={mapOptions}
+              onLoad={onLoad}
+              onClick={handleClick}
+            >
+          
+          {/* Alternative Routes (Grey, Click for Tooltip) */}
+          {routeSegments.filter(s => !s.isMainRoute).map((segment, index) => {
+            const isSelected = selectedRouteInfo?.routeIndex === segment.routeIndex && !selectedRouteInfo?.isMain;
+            const segmentKey = `alt-${segment.routeIndex}`;
+            return (
             <Polyline
-              key={index}
+              key={segmentKey}
+              path={segment.path}
+              onClick={(e) => handleRouteClick(e, segment, segmentKey)}
+              options={{
+                strokeColor: isSelected ? '#3b82f6' : '#6b7280',
+                strokeOpacity: isSelected ? 1 : 0.6,
+                strokeWeight: isSelected ? 7 : 4,
+                zIndex: isSelected ? 20 : 5,
+                clickable: true,
+                cursor: 'pointer',
+              }}
+            />
+            );
+          })}
+
+          {/* Main Route Casing (White Outline for visibility) */}
+          {routeSegments.filter(s => s.isMainRoute).map((segment, index) => (
+             <Polyline
+              key={`main-casing-${index}`}
               path={segment.path}
               options={{
-                strokeColor: segment.color,
-                strokeOpacity: 1,
-                strokeWeight: 6,
+                strokeColor: '#ffffff',
+                strokeOpacity: 0.9,
+                strokeWeight: 10,
                 zIndex: 10,
+                clickable: false,
               }}
             />
           ))}
 
-          {/* Route outline for visibility */}
-          {routeSegments.length > 0 && (
-            <Polyline
-              path={routeSegments.flatMap(s => s.path)}
-              options={{
-                strokeColor: '#1e293b',
-                strokeOpacity: 0.3,
-                strokeWeight: 10,
-                zIndex: 5,
-              }}
-            />
+          {/* Main Route Traffic (Actual Traffic Colors, Clickable) */}
+          {(() => {
+            const mainSegments = routeSegments.filter(s => s.isMainRoute);
+            if (mainSegments.length === 0) return null;
+            
+            const isSelected = selectedRouteInfo?.isMain === true;
+            const firstSegment = mainSegments[0]; // Use first segment for duration data
+            
+            return mainSegments.map((segment, index) => (
+              <Polyline
+                key={`main-traffic-${index}`}
+                path={segment.path}
+                onClick={(e) => handleRouteClick(e, firstSegment, 'main-route')}
+                options={{
+                  strokeColor: segment.color, // Keep individual segment colors
+                  strokeOpacity: 1,
+                  strokeWeight: isSelected ? 8 : 6,
+                  zIndex: 11,
+                  clickable: true,
+                  cursor: 'pointer',
+                }}
+              />
+            ));
+          })()}
+
+          {/* Custom Tooltip for Clicked Route */}
+          {selectedRouteInfo && (
+              <OverlayView
+                  position={selectedRouteInfo.latLng}
+                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                  getPixelPositionOffset={(width, height) => ({ x: -(width / 2), y: -height - 20 })}
+              >
+                  <div 
+                    style={{
+                      position: 'relative',
+                      backgroundColor: 'white',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      minWidth: '140px',
+                      maxWidth: '200px',
+                      pointerEvents: 'auto',
+                    }}
+                  >
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setSelectedRouteInfo(null)}
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: 'transparent',
+                        border: 'none',
+                        fontSize: '20px',
+                        cursor: 'pointer',
+                        color: '#64748b',
+                        padding: '0',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      aria-label="Close"
+                    >
+                      ×
+                    </button>
+
+                    {/* Duration */}
+                    <div style={{ 
+                      fontWeight: 'bold', 
+                      fontSize: '18px', 
+                      color: '#0f172a', 
+                      marginBottom: '8px',
+                      paddingRight: '20px',
+                    }}>
+                      ⏱️ {selectedRouteInfo.duration}
+                    </div>
+                    
+                    {/* Route Type Badge */}
+                    <div style={{ 
+                      fontSize: '11px', 
+                      color: selectedRouteInfo.isMain ? '#059669' : '#6366f1', 
+                      fontWeight: '600',
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.05em',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: selectedRouteInfo.isMain ? '#d1fae5' : '#e0e7ff',
+                      display: 'inline-block',
+                    }}>
+                      {selectedRouteInfo.isMain ? '✓ Primary Route' : 'Alternative Route'}
+                    </div>
+
+                    {/* Arrow pointing down */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-8px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '8px solid transparent',
+                      borderRight: '8px solid transparent',
+                      borderTop: '8px solid white',
+                    }} />
+                  </div>
+              </OverlayView>
           )}
 
           {/* Origin Marker */}
